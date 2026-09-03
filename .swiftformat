@@ -1,0 +1,12 @@
+# swiftformat — https://github.com/nicklockwood/SwiftFormat
+--swiftversion 6.0
+--indent 2
+--maxwidth 100
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--trimwhitespace always
+--stripunusedargs closure-only
+--self remove
+--header strip
+--disable wrapMultilineStatementBraces
