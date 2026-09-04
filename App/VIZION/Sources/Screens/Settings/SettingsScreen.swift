@@ -646,6 +646,9 @@ struct OwnerSection: View {
             if !editing {
               settingWrite($status) {
                 try await env.profiles?.updateAppSettings(devAccentStrength: Int(strength))
+                // Library cards read `env.appSettings` — refresh so the new
+                // strength renders without a relaunch.
+                await env.refreshAccount()
               }
             }
           }

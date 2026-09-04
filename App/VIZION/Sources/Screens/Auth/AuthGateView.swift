@@ -227,13 +227,18 @@ struct SignInForm: View {
   private func signIn(with provider: SupabaseService.OAuthProvider) async {
     guard let supabase = env.supabase else { return }
     status = .sending
+    // Stamp the attempt BEFORE the provider round-trip: an account created
+    // after this instant is one this flow minted (see `AppEnvironment`).
+    env.oauthAttemptStartedAt = Date()
     do {
       try await supabase.signIn(with: provider)
       status = .idle
     } catch is CancellationError {
       // Backed out of the consent screen — every control returns to idle.
+      env.oauthAttemptStartedAt = nil
       status = .idle
     } catch {
+      env.oauthAttemptStartedAt = nil
       status = .error(error.localizedDescription)
     }
   }

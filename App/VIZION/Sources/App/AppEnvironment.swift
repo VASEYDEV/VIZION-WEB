@@ -35,6 +35,10 @@ final class AppEnvironment {
   /// The account whose composer defaults the UI store carries — hydration
   /// happens once per account (web `ProfileHydrator`), never per refresh.
   private var hydratedUserID: String?
+  /// Set by the sign-in screen when it starts an OAuth flow; consumed by
+  /// `purgeIfMintedWhileClosed`. Only an account created AFTER this instant
+  /// can be one that flow minted.
+  var oauthAttemptStartedAt: Date?
   /// A `?draft=` that arrived while the app was signed out or mid-launch.
   var pendingDraft: String?
   var pendingPromptID: String?
@@ -152,9 +156,17 @@ final class AppEnvironment {
   /// endpoint (companion patch not deployed) the account is only signed out,
   /// which is where the web stops too; the runbook names the project-level
   /// switch that hard-enforces it.
+  ///
+  /// The proof that THIS sign-in minted the account is the OAuth attempt the
+  /// sign-in screen recorded: the auth user must have been created after that
+  /// attempt began. An account that is merely young is somebody's real
+  /// account and is never touched.
   private func purgeIfMintedWhileClosed(_ session: SupabaseService.SessionInfo) async -> Bool {
+    guard let attempt = oauthAttemptStartedAt else { return false }
+    oauthAttemptStartedAt = nil
     guard !appSettings.open_access, !isOwner(session.userID),
-          let created = session.createdAt, Date().timeIntervalSince(created) < 120
+          let created = session.createdAt, created >= attempt,
+          Date().timeIntervalSince(attempt) < 600
     else { return false }
     if let api {
       try? await api.deleteAccount()

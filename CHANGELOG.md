@@ -68,7 +68,13 @@ All notable changes to VIZION for iOS are documented here. The format follows
 - **Sign-in (security)**: an account that a Google/GitHub sign-in mints while
   registration is closed is removed again through the companion endpoint and
   signed out — OAuth cannot be told `shouldCreateUser`; the runbook names the
-  project-level switch for hard enforcement.
+  project-level switch for hard enforcement. The proof that the sign-in
+  minted the account is the app's own OAuth attempt stamp: only an auth user
+  created after that instant qualifies, never an account that is merely young.
+- **Owner console**: saving the accent strength refreshes the app settings so
+  library cards render the new value at once.
+- **Result**: a Polish review decision clears the "Saved" state, since the
+  shown output is no longer the saved one.
 - **Accounts**: the last result is re-scoped to the signed-in user before any
   network call, so another account's cached enhancement can never show even
   when the profile request fails; composer defaults hydrate once per account

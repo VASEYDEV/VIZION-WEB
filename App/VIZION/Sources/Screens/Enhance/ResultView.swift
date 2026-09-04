@@ -76,6 +76,11 @@ struct ResultView: View {
       answers = Array(repeating: "", count: result.questions?.count ?? 0)
       savedID = nil
     }
+    // Polish review decisions change `effectiveOutput` without a new result;
+    // what was saved is then no longer what is shown.
+    .onChange(of: view.rejected) { _, _ in
+      savedID = nil
+    }
   }
 
   // MARK: Pieces
