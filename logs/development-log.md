@@ -72,3 +72,12 @@ instead of marking ready with the wrong intent.
 `swiftlint --strict` clean (0.65.1) · `swiftc -parse` on every `App/` source.
 NOT verified: `xcodebuild` — the app target still compiles only in CI.
 
+**Later the same session — first green app build.** After three more CI
+rounds (`ScreenHeader` init isolation, `client` access for the Drafts
+extension, SwiftFormat/SwiftLint version drift on the runner) `xcodebuild`
+reported **Build Succeeded** for the app target on `14c2e88` — the first
+time the `App/` sources have compiled under an Apple toolchain. The unit-test
+step then failed before running: the simulator-name grep captured a trailing
+space (`iPhone 16 Pro `), which the destination matcher rejects. Fixed in the
+workflow; the app unit tests (UIStore, AppConfig) are the next unknown.
+

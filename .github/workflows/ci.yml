@@ -48,7 +48,7 @@ jobs:
       - name: Unit tests
         run: |
           set -o pipefail
-          SIM="$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [0-9A-Za-z ]+' | head -1)"
+          SIM="$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [0-9A-Za-z]+( [0-9A-Za-z]+)*' | head -1)"
           xcodebuild -project VIZION.xcodeproj -scheme VIZION \
             -destination "platform=iOS Simulator,name=${SIM:-iPhone 16}" \
             CODE_SIGNING_ALLOWED=NO test | xcbeautify
