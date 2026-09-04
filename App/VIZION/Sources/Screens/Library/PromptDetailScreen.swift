@@ -38,6 +38,9 @@ final class PromptDetailViewModel {
   private(set) var head: PromptHead?
   private(set) var versions: [VersionMeta] = []
   private(set) var bodies: [String: VersionBody] = [:]
+  /// Per-version load failures — a body slot shows these instead of a
+  /// spinner that never ends.
+  private(set) var bodyErrors: [String: String] = [:]
   private(set) var loading = true
   private(set) var error: String?
 
@@ -111,9 +114,11 @@ final class PromptDetailViewModel {
 
   func ensureBody(_ id: String) async {
     guard bodies[id] == nil, let library = env.library else { return }
-    if let body = try? await library
-      .versionBody(promptID: promptID, versionID: id) {
-      bodies[id] = body
+    do {
+      bodies[id] = try await library.versionBody(promptID: promptID, versionID: id)
+      bodyErrors[id] = nil
+    } catch {
+      bodyErrors[id] = error.localizedDescription
     }
   }
 
@@ -355,6 +360,22 @@ struct PromptDetailView: View {
     }
   }
 
+  /// The slot a version body occupies while it loads — or its failure with a
+  /// retry, never an indefinite spinner.
+  @ViewBuilder
+  private func bodyPending(_ ids: [String?]) -> some View {
+    if let id = ids.compactMap(\.self).first(where: { model.bodyErrors[$0] != nil }),
+       let message = model.bodyErrors[id] {
+      VStack(alignment: .leading, spacing: 6) {
+        Text("Couldn't load this version. \(message)").font(.vzBody(12))
+          .foregroundStyle(VZ.flare)
+        Button("Retry") { Task { await model.ensureBody(id) } }.buttonStyle(.secondaryInline)
+      }
+    } else {
+      ProgressView().tint(VZ.accent)
+    }
+  }
+
   private var currentPanel: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
@@ -378,7 +399,7 @@ struct PromptDetailView: View {
           Text(rationale).font(.vzBody(13)).foregroundStyle(VZ.muted)
         }
       } else {
-        ProgressView().tint(VZ.accent)
+        bodyPending([model.currentID])
       }
     }
   }
@@ -451,7 +472,7 @@ struct PromptDetailView: View {
           Text("Too long to diff.").font(.vzBody(12)).foregroundStyle(VZ.muted)
         }
       } else {
-        ProgressView().tint(VZ.accent)
+        bodyPending([model.compareA, model.compareB])
       }
     }
   }

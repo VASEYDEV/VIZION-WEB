@@ -41,6 +41,15 @@ All notable changes to VIZION for iOS are documented here. The format follows
   follows the web — the composer takes the draft and a failed server delete is
   announced instead of leaving the editor and the list disagreeing; the
   "Restored" toast waits for the write to succeed.
+- **Attachments**: the tray caps at four across picker sessions (the number of
+  reference blocks a prompt carries), the picker offers only the remaining
+  room, and Clear leaves the tray alone as the web does, so it can never
+  orphan a kept asset.
+- **Library**: All/Favorites/Drafts chips carry the whole filter (tag and
+  collection included); a version body that fails to load shows the error
+  with Retry instead of an endless spinner.
+- **Privacy**: the photo-library purpose string states that an attached photo
+  is sent to the selected model for analysis and stored only if kept.
 - **Lint**: SwiftLint config matched to the wire-shaped Codable rows and the
   cursor tuples; SVG path data in tight disable regions; long user copy as
   multi-line literals; `LibraryRepository`, `LibraryScreen` and the composer

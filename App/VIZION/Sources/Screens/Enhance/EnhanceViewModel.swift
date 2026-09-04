@@ -29,6 +29,10 @@ final class EnhanceViewModel {
   var draftOffer: String?
 
   var attachments: [Attachment] = []
+  /// The tray holds at most as many items as the prompt can carry as
+  /// reference blocks; anything past that would be uploaded and analyzed
+  /// for nothing.
+  static let maxAttachments = MediaContext.maxItems
   var pendingPick: [PhotosPickerItem] = []
   var showPrivacyNotice = false
   private var queueTask: Task<Void, Never>?
@@ -83,20 +87,19 @@ final class EnhanceViewModel {
   }
 
   /// Clear the draft + result, undoably. Clearing mid-run cancels the run.
+  /// The tray is untouched (web `performClear`): a kept asset leaves only
+  /// through Remove or Settings, so Clear can never orphan stored media.
   func clear() {
     let priorDraft = ui.editorDraft
     let priorView = view
-    let priorAttachments = attachments
     cancel()
     ui.editorDraft = ""
-    attachments = []
     env.results.set(nil, userID: env.session?.userID)
     error = nil
     if !priorDraft.isEmpty || priorView != nil {
       env.toasts.show("Cleared", actionLabel: "Undo") { [weak self] in
         guard let self else { return }
         ui.editorDraft = priorDraft
-        attachments = priorAttachments
         env.results.set(priorView, userID: env.session?.userID)
       }
     }
@@ -396,8 +399,16 @@ extension EnhanceViewModel {
     await enqueue(items)
   }
 
+  var attachmentsFull: Bool {
+    attachments.count >= Self.maxAttachments
+  }
+
   private func enqueue(_ items: [PhotosPickerItem]) async {
-    for item in items {
+    let room = max(0, Self.maxAttachments - attachments.count)
+    if items.count > room {
+      env.toasts.error("Up to \(Self.maxAttachments) attachments — the rest were skipped.")
+    }
+    for item in items.prefix(room) {
       guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
       let type = item.supportedContentTypes.first
       let mime = type?.preferredMIMEType ?? "image/jpeg"

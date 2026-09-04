@@ -136,10 +136,15 @@ struct EnhanceComposer: View {
           ); Text("Templates") } }
             .buttonStyle(.quiet)
         }
-        PhotosPicker(selection: $model.pendingPick, maxSelectionCount: 4, matching: .images) {
+        PhotosPicker(
+          selection: $model.pendingPick,
+          maxSelectionCount: max(1, EnhanceViewModel.maxAttachments - model.attachments.count),
+          matching: .images
+        ) {
           HStack(spacing: 4) { IconView(.paperclip, size: 14); Text("Attach") }
         }
         .buttonStyle(.quiet)
+        .disabled(model.attachmentsFull)
         .onChange(of: model.pendingPick) { _, items in
           guard !items.isEmpty, !model.showPrivacyNotice else { return }
           Task {

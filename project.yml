@@ -78,7 +78,7 @@ targets:
         UIUserInterfaceStyle: Automatic
         ITSAppUsesNonExemptEncryption: false
         UIApplicationSupportsIndirectInputEvents: true
-        NSPhotoLibraryUsageDescription: VIZION reads a photo you attach as visual context for your prompt. Nothing is uploaded unless you choose to keep it.
+        NSPhotoLibraryUsageDescription: A photo you attach is sent to the AI model you selected so it can describe the image for your prompt. It is saved to your private VIZION storage only if you choose to keep it.
         NSCameraUsageDescription: VIZION can photograph a reference to attach to your prompt.
         # vizion://enhance?draft=…  (Siri Shortcuts + share sheet)  and
         # vizion://auth/callback     (Supabase OAuth / magic-link PKCE return)

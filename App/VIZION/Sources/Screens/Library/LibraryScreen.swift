@@ -146,13 +146,10 @@ struct LibraryBrowser: View {
 
   private func quickChip(_ label: String, view: LibraryView) -> some View {
     Button {
-      model.filter = LibraryFilter(
-        q: model.filter.q,
-        model: model.filter.model,
-        mode: model.filter.mode,
-        view: view,
-        sort: model.filter.sort
-      )
+      // Web: `libraryHref({ ...filter, view })` — only the view changes.
+      var next = model.filter
+      next.view = view
+      model.filter = next
     } label: {
       ChipLabel(text: label, selected: model.filter.view == view)
     }
