@@ -8,7 +8,7 @@ struct ScreenHeader<Action: View>: View {
   var brand = false
   @ViewBuilder var action: Action
 
-  nonisolated init(title: String? = nil, brand: Bool = false, @ViewBuilder action: () -> Action) {
+  init(title: String? = nil, brand: Bool = false, @ViewBuilder action: () -> Action) {
     self.title = title
     self.brand = brand
     self.action = action()
@@ -37,7 +37,7 @@ struct ScreenHeader<Action: View>: View {
 }
 
 extension ScreenHeader where Action == EmptyView {
-  nonisolated init(title: String? = nil, brand: Bool = false) {
+  init(title: String? = nil, brand: Bool = false) {
     self.init(title: title, brand: brand) { EmptyView() }
   }
 }
