@@ -22,11 +22,36 @@ Apply `docs/companion/0001-native-bearer-auth-and-account-deletion.patch` to
 merge, deploy. `SUPABASE_SERVICE_ROLE_KEY` must be set on Vercel for
 `DELETE /api/account` (it already is for the web deletion route).
 
+## Sign in with Apple (ADR-0006)
+
+The app signs in natively (identity token → Supabase's id-token grant), so the
+provider needs only its **client ids**, not the web Services ID flow:
+
+1. Apple Developer → Certificates, Identifiers & Profiles → the App ID
+   `ai.vasey.vizion` → enable **Sign in with Apple**.
+2. Apple Developer → Keys → **new key with Sign in with Apple** → download the
+   `.p8` ONCE. Note its Key ID and the Team ID.
+3. Supabase → Authentication → Providers → **Apple**: enable it and put
+   `ai.vasey.vizion` in **Client IDs** (comma-separated with any others). The
+   Secret Key field belongs to the web flow — leave it empty unless the web app
+   later adds Apple sign-in.
+4. Vercel env for the companion patch's revocation bookkeeping:
+   `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_CLIENT_ID=ai.vasey.vizion`,
+   `APPLE_PRIVATE_KEY` (the `.p8` contents; `\n`-escaped is accepted).
+5. `supabase db push` for the two migrations in `0002-sign-in-with-apple.patch`
+   — the `apple` enum label and `handle_new_user()`. Until they land, an Apple
+   account is filed as `magic_link` and hits the set-password gate.
+
+Deleting an account revokes the Apple token first; without the `APPLE_*` env the
+deletion is logged and proceeds, so nobody is stuck with an account they asked
+to remove.
+
 ## Closed registration and OAuth
 
 Magic links honour the owner's open-access switch (`shouldCreateUser`); Supabase
-OAuth cannot be told "no new accounts". The app therefore removes an account that
-a Google/GitHub sign-in minted while access was closed (`DELETE /api/account`
+OAuth and the Apple id-token grant cannot be told "no new accounts". The app
+therefore removes an account that an Apple/Google/GitHub sign-in minted while
+access was closed (`DELETE /api/account`
 from the companion patch, then sign-out). To hard-enforce it at the source,
 also turn off **Authentication → Providers → Allow new users to sign up** in
 the Supabase dashboard whenever access is closed; turn it back on with

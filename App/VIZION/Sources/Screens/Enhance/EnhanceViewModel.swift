@@ -232,7 +232,8 @@ final class EnhanceViewModel {
             submitted: submitted,
             result: done,
             refined: refined ? true : nil,
-            rejected: nil
+            rejected: nil,
+            previousOutput: refined ? request.input : nil
           ),
           userID: userID
         )

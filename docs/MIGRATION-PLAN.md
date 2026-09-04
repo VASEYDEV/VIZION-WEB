@@ -43,7 +43,9 @@ eviction), take the native capability instead.
 ## M6 — ship checklist
 
 - Icon Composer `.icon` from `Design/brand/vizion-icon-foreground-*.svg` (light/dark/clear/tinted).
-- `PrivacyInfo.xcprivacy` (UserDefaults API reason; no tracking).
+- ~~`PrivacyInfo.xcprivacy`~~ ✅ authored (`App/VIZION/Resources/`).
+- ~~Sign in with Apple (guideline 4.8)~~ ✅ ADR-0006; needs the App ID
+  capability, the Supabase client id and the `APPLE_*` server env at bring-up.
 - App Store metadata: name, subtitle, screenshots on a 6.9" device, privacy labels
   (email, user content), support URL, review notes with a test account.
 - TestFlight internal → external; crash-free session on the beta OS.
@@ -61,5 +63,5 @@ eviction), take the native capability instead.
 | supabase-swift API drift vs. what was authored | High | Low (localized) | `Services/` is the only consumer; reconcile once in Xcode |
 | Web API rejects Bearer (patch not deployed) | Certain until deployed | Blocks all model calls | Patch validated; ship it first |
 | iOS 26 SDK-only APIs on an older Xcode | Medium | Build break | `#if compiler(>=6.2)` + `#available` gates |
-| App Review: account deletion, sign-in with Apple | Medium | Rejection | `DELETE /api/account` in-app; add Sign in with Apple in M6 if Google/GitHub remain (guideline 4.8) |
+| App Review: account deletion, sign-in with Apple | Low | Rejection | `DELETE /api/account` in-app; Sign in with Apple shipped (ADR-0006), with Apple-token revocation on deletion (5.1.1(v)) |
 | Fonts are latin subsets | Low | Tofu on non-latin input | Re-vendor full TTFs before ship |

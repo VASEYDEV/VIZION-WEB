@@ -302,6 +302,13 @@ struct ResultView: View {
     }
   }
 
+  /// What the "Original / Previous result" panel shows when there is no diff
+  /// to reconstruct it from (over the diff budget): a refinement's own input,
+  /// never the author's original under a "Previous result" caption.
+  private var originalFallback: String {
+    view.refined == true ? view.previousOutput ?? view.submitted.input : view.submitted.input
+  }
+
   private var originalPanel: some View {
     VStack(alignment: .leading, spacing: 8) {
       Button {
@@ -327,7 +334,7 @@ struct ResultView: View {
               hunkIDs: WordDiff.assignHunks(diff)
             )
           } else {
-            Text(view.submitted.input)
+            Text(originalFallback)
           }
         }
         .font(.vzBody(14))

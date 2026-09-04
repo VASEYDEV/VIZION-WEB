@@ -50,7 +50,9 @@ packages:
     path: Packages/VizionCore
   Supabase:
     url: https://github.com/supabase/supabase-swift
-    from: "2.0.0"
+    # Exact pin: the generated project's Package.resolved is gitignored, so
+    # this line IS the reviewable resolution (SECURITY.md → Dependencies).
+    exactVersion: "2.55.1"
 
 targets:
   VIZION:
@@ -59,7 +61,9 @@ targets:
     sources:
       - path: App/VIZION/Sources
       - path: App/VIZION/Resources
-        # Fonts + asset catalog are copied as bundle resources.
+        # Fonts, asset catalog and PrivacyInfo.xcprivacy are copied as bundle
+        # resources (the manifest lands at the bundle root, where App Store
+        # Connect looks for it).
     dependencies:
       - package: VizionCore
       - package: Supabase
@@ -98,7 +102,10 @@ targets:
         VizionAPIBaseURL: $(VIZION_API_BASE_URL)
     entitlements:
       path: App/VIZION/VIZION.entitlements
-      properties: {}
+      properties:
+        # Sign in with Apple (ADR-0006). Automatic signing adds the capability
+        # to the App ID; the simulator build (CODE_SIGNING_ALLOWED=NO) ignores it.
+        com.apple.developer.applesignin: [Default]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.vasey.vizion

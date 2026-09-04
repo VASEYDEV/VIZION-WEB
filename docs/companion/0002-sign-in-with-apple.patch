@@ -1,0 +1,864 @@
+diff --git a/SECURITY.md b/SECURITY.md
+index cf052b1..b126850 100644
+--- a/SECURITY.md
++++ b/SECURITY.md
+@@ -27,6 +27,10 @@ hours and to ship a fix or mitigation promptly.
+   It is constructed per request after the session is verified, the only identifier
+   it ever receives is the session's own user id, and when
+   `SUPABASE_SERVICE_ROLE_KEY` is unset the flow fails closed with a clear error.
++- **Sign in with Apple tokens** (`apple_refresh_tokens`, native app only) are
++  written by the owner's own session (RLS: own row) and read by the service role
++  solely to revoke them inside `purgeAccount`, as Apple requires on account
++  deletion. The `APPLE_*` client-secret key (`.p8`) is server-side only.
+ - **Per-user rate limits and cost caps** on every model route.
+ - **Parameterized queries** everywhere; no string-built SQL.
+ - **`npm audit`** runs in CI on every PR and push to `main`.
+diff --git a/src/app/api/auth/apple/route.ts b/src/app/api/auth/apple/route.ts
+new file mode 100644
+index 0000000..6187214
+--- /dev/null
++++ b/src/app/api/auth/apple/route.ts
+@@ -0,0 +1,82 @@
++import { NextResponse, type NextRequest } from "next/server";
++import { createClient } from "@/lib/supabase/server";
++import { appleConfig, exchangeAppleCode } from "@/lib/auth/apple";
++import { rateLimit } from "@/lib/security/rate-limit";
++
++/**
++ * Sign in with Apple bookkeeping for the native app (vizion-web ADR-0006).
++ *
++ * After the app has signed in — Apple's identity token verified by Supabase,
++ * session in hand — it posts the authorization code from the same credential
++ * here. The server exchanges it for a refresh token and keeps that against
++ * the user, so `DELETE /api/account` can revoke it: Apple requires apps that
++ * offer Sign in with Apple to revoke the user's tokens on account deletion
++ * (App Store Review Guideline 5.1.1(v)). Nothing about the sign-in itself
++ * depends on this call succeeding.
++ *
++ * The row is written with the USER's session (RLS: own row only) — the
++ * service-role client stays confined to deletion.
++ *
++ *   204  stored
++ *   400  no `code` in the JSON body
++ *   401  no verified session
++ *   429  more than five attempts in an hour
++ *   502  Apple rejected the code (expired, reused, wrong client id)
++ *   503  APPLE_* not configured on the server — nothing stored
++ */
++export async function POST(req: NextRequest) {
++  const supabase = await createClient();
++  const {
++    data: { user },
++  } = await supabase.auth.getUser();
++  if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
++
++  if (!rateLimit(`apple-code:${user.id}`, 5, 3_600_000).allowed) {
++    return NextResponse.json(
++      { error: "Too many attempts — try again later." },
++      { status: 429 },
++    );
++  }
++
++  const body = (await req.json().catch(() => null)) as { code?: unknown } | null;
++  const code = typeof body?.code === "string" ? body.code.trim() : "";
++  if (!code || code.length > 4096) {
++    return NextResponse.json({ error: "Missing authorization code." }, { status: 400 });
++  }
++
++  const config = appleConfig();
++  if (!config) {
++    console.error(
++      "[api/auth/apple] APPLE_TEAM_ID/KEY_ID/CLIENT_ID/PRIVATE_KEY not configured",
++    );
++    return NextResponse.json(
++      { error: "Sign in with Apple isn't configured on the server yet." },
++      { status: 503 },
++    );
++  }
++
++  let refreshToken: string;
++  try {
++    ({ refreshToken } = await exchangeAppleCode(config, code));
++  } catch (e) {
++    console.error(
++      "[api/auth/apple] exchange failed:",
++      e instanceof Error ? e.message : e,
++    );
++    return NextResponse.json(
++      { error: "Apple did not accept the authorization code." },
++      { status: 502 },
++    );
++  }
++
++  const { error } = await supabase.from("apple_refresh_tokens").upsert({
++    user_id: user.id,
++    refresh_token: refreshToken,
++    updated_at: new Date().toISOString(),
++  });
++  if (error) {
++    console.error("[api/auth/apple] store failed:", error.message);
++    return NextResponse.json({ error: "Couldn't store the token." }, { status: 500 });
++  }
++  return new NextResponse(null, { status: 204 });
++}
+diff --git a/src/components/settings/SettingsPanel.tsx b/src/components/settings/SettingsPanel.tsx
+index 2fa66b6..b13fc2b 100644
+--- a/src/components/settings/SettingsPanel.tsx
++++ b/src/components/settings/SettingsPanel.tsx
+@@ -30,6 +30,7 @@ import type { Profile } from "@/lib/supabase/database.types";
+ const AUTH_LABEL: Record<string, string> = {
+   github: "Connected with GitHub",
+   google: "Connected with Google",
++  apple: "Connected with Apple",
+   magic_link: "Signed in with email",
+ };
+ 
+diff --git a/src/lib/auth/apple.ts b/src/lib/auth/apple.ts
+new file mode 100644
+index 0000000..dcc0684
+--- /dev/null
++++ b/src/lib/auth/apple.ts
+@@ -0,0 +1,147 @@
++import "server-only";
++import { createPrivateKey, sign } from "node:crypto";
++
++/**
++ * Sign in with Apple, server side (vizion-web ADR-0006).
++ *
++ * The native app signs in with Apple's identity token straight against
++ * Supabase; nothing here is on that path. This module exists for the one
++ * thing Supabase does not do: Apple requires an app that offers Sign in with
++ * Apple to REVOKE the user's tokens when the account is deleted (App Store
++ * Review Guideline 5.1.1(v)). Revocation needs a refresh token, and the only
++ * way to get one is to exchange the single-use authorization code the app
++ * received at sign-in — so `POST /api/auth/apple` exchanges and stores it,
++ * and `purgeAccount` revokes it.
++ *
++ * Both calls authenticate to Apple with a client secret: an ES256 JWT signed
++ * by the team's Sign in with Apple key (.p8). Minted per call, five minutes
++ * long — the six-month maximum Apple allows is for pre-generated secrets.
++ */
++
++const APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token";
++const APPLE_REVOKE_URL = "https://appleid.apple.com/auth/revoke";
++const APPLE_AUDIENCE = "https://appleid.apple.com";
++
++export interface AppleConfig {
++  /** Apple Developer Team ID (10 characters). */
++  teamId: string;
++  /** Key ID of the Sign in with Apple key. */
++  keyId: string;
++  /** The iOS app's bundle id — the client id of the native flow. */
++  clientId: string;
++  /** The .p8 contents (PKCS#8 PEM). `\n` escapes are accepted for env storage. */
++  privateKey: string;
++}
++
++/**
++ * APPLE_TEAM_ID · APPLE_KEY_ID · APPLE_CLIENT_ID · APPLE_PRIVATE_KEY. Null when
++ * any is missing: callers then skip Apple (the sign-in itself never depends
++ * on this — only the revocation bookkeeping does).
++ */
++export function appleConfig(
++  env: Record<string, string | undefined> = process.env,
++): AppleConfig | null {
++  const teamId = env.APPLE_TEAM_ID?.trim();
++  const keyId = env.APPLE_KEY_ID?.trim();
++  const clientId = env.APPLE_CLIENT_ID?.trim();
++  const privateKey = env.APPLE_PRIVATE_KEY?.trim().replace(/\\n/g, "\n");
++  if (!teamId || !keyId || !clientId || !privateKey) return null;
++  return { teamId, keyId, clientId, privateKey };
++}
++
++function base64url(value: object | Buffer): string {
++  const buffer = Buffer.isBuffer(value) ? value : Buffer.from(JSON.stringify(value));
++  return buffer.toString("base64url");
++}
++
++/** The client secret Apple's token and revoke endpoints require. */
++export function appleClientSecret(config: AppleConfig, now: number = Date.now()): string {
++  const issuedAt = Math.floor(now / 1000);
++  const header = { alg: "ES256", kid: config.keyId, typ: "JWT" };
++  const payload = {
++    iss: config.teamId,
++    iat: issuedAt,
++    exp: issuedAt + 300,
++    aud: APPLE_AUDIENCE,
++    sub: config.clientId,
++  };
++  const signingInput = `${base64url(header)}.${base64url(payload)}`;
++  const signature = sign("sha256", Buffer.from(signingInput), {
++    key: createPrivateKey(config.privateKey),
++    // JOSE wants the raw r‖s pair, not the DER sequence.
++    dsaEncoding: "ieee-p1363",
++  });
++  return `${signingInput}.${base64url(signature)}`;
++}
++
++type Fetch = typeof fetch;
++
++async function postForm(
++  url: string,
++  fields: Record<string, string>,
++  fetchImpl: Fetch,
++): Promise<Response> {
++  return fetchImpl(url, {
++    method: "POST",
++    headers: { "content-type": "application/x-www-form-urlencoded" },
++    body: new URLSearchParams(fields).toString(),
++  });
++}
++
++/**
++ * Exchange the authorization code from `ASAuthorizationAppleIDCredential` for
++ * a refresh token. The code is single-use and lives five minutes; Supabase's
++ * id-token grant never consumes it, so it is still ours to exchange.
++ */
++export async function exchangeAppleCode(
++  config: AppleConfig,
++  code: string,
++  fetchImpl: Fetch = fetch,
++): Promise<{ refreshToken: string }> {
++  const res = await postForm(
++    APPLE_TOKEN_URL,
++    {
++      client_id: config.clientId,
++      client_secret: appleClientSecret(config),
++      code,
++      grant_type: "authorization_code",
++    },
++    fetchImpl,
++  );
++  const body = (await res.json().catch(() => null)) as {
++    refresh_token?: unknown;
++    error?: unknown;
++  } | null;
++  if (!res.ok || typeof body?.refresh_token !== "string" || !body.refresh_token) {
++    const reason = typeof body?.error === "string" ? body.error : `HTTP ${res.status}`;
++    throw new Error(`apple token exchange failed: ${reason}`);
++  }
++  return { refreshToken: body.refresh_token };
++}
++
++/**
++ * Revoke a refresh token (and every session Apple issued from it). 200 means
++ * revoked; `invalid_grant` means it already was, which is the same outcome.
++ * Anything else throws so the caller can stop before destroying data.
++ */
++export async function revokeAppleToken(
++  config: AppleConfig,
++  refreshToken: string,
++  fetchImpl: Fetch = fetch,
++): Promise<void> {
++  const res = await postForm(
++    APPLE_REVOKE_URL,
++    {
++      client_id: config.clientId,
++      client_secret: appleClientSecret(config),
++      token: refreshToken,
++      token_type_hint: "refresh_token",
++    },
++    fetchImpl,
++  );
++  if (res.ok) return;
++  const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
++  if (res.status === 400 && body?.error === "invalid_grant") return;
++  const reason = typeof body?.error === "string" ? body.error : `HTTP ${res.status}`;
++  throw new Error(`apple token revoke failed: ${reason}`);
++}
+diff --git a/src/lib/auth/delete-account.ts b/src/lib/auth/delete-account.ts
+index fb1c076..3adfdc2 100644
+--- a/src/lib/auth/delete-account.ts
++++ b/src/lib/auth/delete-account.ts
+@@ -1,5 +1,6 @@
+ import "server-only";
+ import type { createAdminClient } from "@/lib/supabase/admin";
++import { appleConfig, revokeAppleToken } from "@/lib/auth/apple";
+ 
+ type Admin = NonNullable<ReturnType<typeof createAdminClient>>;
+ 
+@@ -18,6 +19,27 @@ type Admin = NonNullable<ReturnType<typeof createAdminClient>>;
+  * callers decide the response shape.
+  */
+ export async function purgeAccount(admin: Admin, userId: string): Promise<void> {
++  // Sign in with Apple first: Apple requires the user's tokens revoked when
++  // the account goes (Guideline 5.1.1(v)), and a revoke that fails must stop
++  // the deletion while the token row still exists to retry from. No row =
++  // not an Apple account (or the app never posted the code) — nothing to do.
++  // Missing APPLE_* config is logged, not fatal: the person asked for their
++  // account to go, and that must not hang on a server env gap.
++  const { data: apple, error: appleErr } = await admin
++    .from("apple_refresh_tokens")
++    .select("refresh_token")
++    .eq("user_id", userId)
++    .maybeSingle();
++  if (appleErr) throw new Error(`apple token read failed: ${appleErr.message}`);
++  if (apple?.refresh_token) {
++    const config = appleConfig();
++    if (config) {
++      await revokeAppleToken(config, apple.refresh_token);
++    } else {
++      console.error("[delete-account] APPLE_* not configured — Apple token not revoked");
++    }
++  }
++
+   // Media originals: {user_id}/<uuid>.<ext> — paginate the listing so a
+   // large library can't strand objects past the first page.
+   const mediaStore = admin.storage.from("media");
+diff --git a/src/lib/supabase/database.types.ts b/src/lib/supabase/database.types.ts
+index 6c04597..e2975dc 100644
+--- a/src/lib/supabase/database.types.ts
++++ b/src/lib/supabase/database.types.ts
+@@ -17,6 +17,24 @@ export type Database = {
+   };
+   public: {
+     Tables: {
++      apple_refresh_tokens: {
++        Row: {
++          refresh_token: string;
++          updated_at: string;
++          user_id: string;
++        };
++        Insert: {
++          refresh_token: string;
++          updated_at?: string;
++          user_id: string;
++        };
++        Update: {
++          refresh_token?: string;
++          updated_at?: string;
++          user_id?: string;
++        };
++        Relationships: [];
++      };
+       media_assets: {
+         Row: {
+           id: string;
+@@ -546,7 +564,7 @@ export type Database = {
+         | "shared"
+         | "restored"
+         | "profile_updated";
+-      auth_method: "magic_link" | "github" | "google";
++      auth_method: "magic_link" | "github" | "google" | "apple";
+       enhance_mode: "clarify" | "polish" | "expand" | "condense" | "reformat" | "target";
+       media_kind: "image" | "video" | "audio";
+       model_target:
+diff --git a/supabase/migrations/20260904190000_auth_method_apple.sql b/supabase/migrations/20260904190000_auth_method_apple.sql
+new file mode 100644
+index 0000000..f9883b0
+--- /dev/null
++++ b/supabase/migrations/20260904190000_auth_method_apple.sql
+@@ -0,0 +1,4 @@
++-- Sign in with Apple (native iOS app, vizion-web ADR-0006).
++-- 1/2: the enum label. A new enum value cannot be used in the transaction that
++-- adds it, so the trigger change follows in the next migration.
++alter type public.auth_method add value if not exists 'apple';
+diff --git a/supabase/migrations/20260904190100_apple_sign_in.sql b/supabase/migrations/20260904190100_apple_sign_in.sql
+new file mode 100644
+index 0000000..95d64d9
+--- /dev/null
++++ b/supabase/migrations/20260904190100_apple_sign_in.sql
+@@ -0,0 +1,83 @@
++-- Sign in with Apple (native iOS app, vizion-web ADR-0006).
++-- 2/2: file Apple accounts under 'apple' (they were falling into the
++-- magic_link branch and its set-password gate), and keep the Apple refresh
++-- token per user so account deletion can revoke it — Apple requires apps
++-- that offer Sign in with Apple to revoke the user's tokens on deletion
++-- (App Store Review Guideline 5.1.1(v)).
++
++create or replace function public.handle_new_user()
++returns trigger
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  v_provider text := new.raw_app_meta_data ->> 'provider';
++  v_auth_method public.auth_method;
++begin
++  v_auth_method := case
++    when v_provider = 'github' then 'github'::public.auth_method
++    when v_provider = 'google' then 'google'::public.auth_method
++    when v_provider = 'apple' then 'apple'::public.auth_method
++    else 'magic_link'::public.auth_method
++  end;
++
++  insert into public.profiles (user_id, email, full_name, avatar_url, auth_method)
++  values (
++    new.id,
++    new.email,
++    coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name'),
++    new.raw_user_meta_data ->> 'avatar_url',
++    v_auth_method
++  )
++  on conflict (user_id) do nothing;
++
++  if v_provider in ('github', 'google') then
++    insert into public.oauth_identities (user_id, provider, provider_uid, raw_profile)
++    values (
++      new.id,
++      v_provider::public.oauth_provider,
++      coalesce(
++        new.raw_user_meta_data ->> 'provider_id',
++        new.raw_user_meta_data ->> 'sub',
++        new.id::text
++      ),
++      new.raw_user_meta_data
++    )
++    on conflict (provider, provider_uid) do nothing;
++  end if;
++
++  return new;
++end;
++$$;
++
++-- Apple refresh tokens: the app stores its own (POST /api/auth/apple, user
++-- session, own row only); purgeAccount reads and revokes with the service
++-- role. Never useful to anyone else: Apple accepts the token only together
++-- with the team's client secret.
++create table public.apple_refresh_tokens (
++  user_id       uuid primary key references auth.users (id) on delete cascade,
++  refresh_token text not null,
++  updated_at    timestamptz not null default now()
++);
++
++comment on table public.apple_refresh_tokens is
++  'Sign in with Apple refresh token per user; revoked on account deletion (owner writes, service role revokes).';
++
++alter table public.apple_refresh_tokens enable row level security;
++
++create policy "apple_refresh_tokens_select_own"
++  on public.apple_refresh_tokens for select
++  using (auth.uid() = user_id);
++
++create policy "apple_refresh_tokens_insert_own"
++  on public.apple_refresh_tokens for insert
++  with check (auth.uid() = user_id);
++
++create policy "apple_refresh_tokens_update_own"
++  on public.apple_refresh_tokens for update
++  using (auth.uid() = user_id)
++  with check (auth.uid() = user_id);
++
++revoke all on table public.apple_refresh_tokens from anon;
++grant select, insert, update on table public.apple_refresh_tokens to authenticated;
+diff --git a/tests/unit/account-route.test.ts b/tests/unit/account-route.test.ts
+index 8316f4f..005d814 100644
+--- a/tests/unit/account-route.test.ts
++++ b/tests/unit/account-route.test.ts
+@@ -19,6 +19,14 @@ const storeMock = vi.hoisted(() => ({
+   ),
+ }));
+ const adminMock = vi.hoisted(() => ({
++  // No Sign in with Apple token row for these accounts.
++  from: vi.fn(() => ({
++    select: vi.fn(() => ({
++      eq: vi.fn(() => ({
++        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
++      })),
++    })),
++  })),
+   storage: { from: vi.fn(() => storeMock) },
+   auth: { admin: { deleteUser: vi.fn(async () => ({ error: null })) } },
+ }));
+diff --git a/tests/unit/apple-auth.test.ts b/tests/unit/apple-auth.test.ts
+new file mode 100644
+index 0000000..c1b39c5
+--- /dev/null
++++ b/tests/unit/apple-auth.test.ts
+@@ -0,0 +1,139 @@
++import { describe, expect, it, vi } from "vitest";
++import { generateKeyPairSync, verify } from "node:crypto";
++import {
++  appleClientSecret,
++  appleConfig,
++  exchangeAppleCode,
++  revokeAppleToken,
++  type AppleConfig,
++} from "@/lib/auth/apple";
++
++/**
++ * Sign in with Apple server helpers: the ES256 client secret, the code →
++ * refresh-token exchange, and revocation. Apple itself is a fetch stub.
++ */
++const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
++const pem = privateKey.export({ type: "pkcs8", format: "pem" }) as string;
++const config: AppleConfig = {
++  teamId: "TEAM123456",
++  keyId: "KEY1234567",
++  clientId: "ai.vasey.vizion",
++  privateKey: pem,
++};
++
++function decode(segment: string): Record<string, unknown> {
++  return JSON.parse(Buffer.from(segment, "base64url").toString()) as Record<
++    string,
++    unknown
++  >;
++}
++
++function stubFetch(status: number, body: unknown) {
++  return vi.fn<(url: string | URL | Request, init?: RequestInit) => Promise<Response>>(
++    async () =>
++      new Response(body === undefined ? null : JSON.stringify(body), { status }),
++  );
++}
++
++describe("appleConfig", () => {
++  it("is null while any APPLE_* variable is missing", () => {
++    expect(appleConfig({})).toBeNull();
++    expect(
++      appleConfig({ APPLE_TEAM_ID: "T", APPLE_KEY_ID: "K", APPLE_CLIENT_ID: "C" }),
++    ).toBeNull();
++  });
++
++  it("unescapes a \\n-encoded key from the environment", () => {
++    const parsed = appleConfig({
++      APPLE_TEAM_ID: " TEAM123456 ",
++      APPLE_KEY_ID: "KEY1234567",
++      APPLE_CLIENT_ID: "ai.vasey.vizion",
++      APPLE_PRIVATE_KEY: pem.trim().replace(/\n/g, "\\n"),
++    });
++    expect(parsed).toEqual({ ...config, privateKey: pem.trim() });
++  });
++});
++
++describe("appleClientSecret", () => {
++  it("is an ES256 JWT for the team, the app and Apple, signed by the .p8 key", () => {
++    const secret = appleClientSecret(config, 1_800_000_000_000);
++    const [header = "", payload = "", signature = ""] = secret.split(".");
++    expect(decode(header)).toEqual({ alg: "ES256", kid: "KEY1234567", typ: "JWT" });
++    expect(decode(payload)).toEqual({
++      iss: "TEAM123456",
++      sub: "ai.vasey.vizion",
++      aud: "https://appleid.apple.com",
++      iat: 1_800_000_000,
++      exp: 1_800_000_300,
++    });
++    expect(
++      verify(
++        "sha256",
++        Buffer.from(`${header}.${payload}`),
++        { key: publicKey, dsaEncoding: "ieee-p1363" },
++        Buffer.from(signature, "base64url"),
++      ),
++    ).toBe(true);
++  });
++});
++
++describe("exchangeAppleCode", () => {
++  it("posts the code with the client secret and returns the refresh token", async () => {
++    const fetchStub = stubFetch(200, { refresh_token: "r1", id_token: "x" });
++    await expect(
++      exchangeAppleCode(config, "code-1", fetchStub as unknown as typeof fetch),
++    ).resolves.toEqual({ refreshToken: "r1" });
++    const [url, init] = fetchStub.mock.calls[0]!;
++    expect(url).toBe("https://appleid.apple.com/auth/token");
++    const form = new URLSearchParams(init?.body as string);
++    expect(form.get("grant_type")).toBe("authorization_code");
++    expect(form.get("code")).toBe("code-1");
++    expect(form.get("client_id")).toBe("ai.vasey.vizion");
++    expect(form.get("client_secret")?.split(".")).toHaveLength(3);
++  });
++
++  it("throws with Apple's error code when the code is refused", async () => {
++    const fetchStub = stubFetch(400, { error: "invalid_grant" });
++    await expect(
++      exchangeAppleCode(config, "stale", fetchStub as unknown as typeof fetch),
++    ).rejects.toThrow("invalid_grant");
++  });
++
++  it("throws when a 200 carries no refresh token", async () => {
++    const fetchStub = stubFetch(200, { id_token: "only" });
++    await expect(
++      exchangeAppleCode(config, "code-2", fetchStub as unknown as typeof fetch),
++    ).rejects.toThrow("HTTP 200");
++  });
++});
++
++describe("revokeAppleToken", () => {
++  it("resolves on 200 and on an already-invalid token", async () => {
++    await expect(
++      revokeAppleToken(
++        config,
++        "r1",
++        stubFetch(200, undefined) as unknown as typeof fetch,
++      ),
++    ).resolves.toBeUndefined();
++    await expect(
++      revokeAppleToken(
++        config,
++        "r1",
++        stubFetch(400, { error: "invalid_grant" }) as unknown as typeof fetch,
++      ),
++    ).resolves.toBeUndefined();
++  });
++
++  it("sends the refresh-token hint and throws on any other failure", async () => {
++    const fetchStub = stubFetch(500, undefined);
++    await expect(
++      revokeAppleToken(config, "r1", fetchStub as unknown as typeof fetch),
++    ).rejects.toThrow("HTTP 500");
++    const [url, init] = fetchStub.mock.calls[0]!;
++    expect(url).toBe("https://appleid.apple.com/auth/revoke");
++    const form = new URLSearchParams(init?.body as string);
++    expect(form.get("token")).toBe("r1");
++    expect(form.get("token_type_hint")).toBe("refresh_token");
++  });
++});
+diff --git a/tests/unit/apple-code-route.test.ts b/tests/unit/apple-code-route.test.ts
+new file mode 100644
+index 0000000..25a12d7
+--- /dev/null
++++ b/tests/unit/apple-code-route.test.ts
+@@ -0,0 +1,116 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { NextRequest } from "next/server";
++
++/**
++ * POST /api/auth/apple — the native app hands over Apple's authorization code
++ * after signing in; the server exchanges it and stores the refresh token in
++ * the USER's own row (no service role on this path).
++ */
++const upsertMock = vi.hoisted(() =>
++  vi.fn<(row: Record<string, unknown>) => Promise<{ error: { message: string } | null }>>(
++    async () => ({ error: null }),
++  ),
++);
++const supabaseMock = vi.hoisted(() => ({
++  auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u1" } } })) },
++  from: vi.fn(() => ({ upsert: upsertMock })),
++}));
++vi.mock("@/lib/supabase/server", () => ({
++  createClient: vi.fn(async () => supabaseMock),
++}));
++const appleMock = vi.hoisted(() => ({
++  appleConfig: vi.fn((): unknown => ({
++    teamId: "T",
++    keyId: "K",
++    clientId: "ai.vasey.vizion",
++    privateKey: "pem",
++  })),
++  exchangeAppleCode: vi.fn(async () => ({ refreshToken: "r1" })),
++}));
++vi.mock("@/lib/auth/apple", () => appleMock);
++
++import { POST } from "@/app/api/auth/apple/route";
++
++function request(body: unknown) {
++  return new NextRequest("https://app.test/api/auth/apple", {
++    method: "POST",
++    headers: { "content-type": "application/json" },
++    body: typeof body === "string" ? body : JSON.stringify(body),
++  });
++}
++
++/** Distinct ids per case: the route's limiter is keyed per user. */
++function signedInAs(id: string) {
++  supabaseMock.auth.getUser.mockResolvedValue({ data: { user: { id } } });
++}
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  vi.spyOn(console, "error").mockImplementation(() => {});
++  appleMock.appleConfig.mockReturnValue({
++    teamId: "T",
++    keyId: "K",
++    clientId: "ai.vasey.vizion",
++    privateKey: "pem",
++  });
++  appleMock.exchangeAppleCode.mockResolvedValue({ refreshToken: "r1" });
++  upsertMock.mockResolvedValue({ error: null });
++});
++
++describe("POST /api/auth/apple", () => {
++  it("401s without a verified session — before reading the body", async () => {
++    supabaseMock.auth.getUser.mockResolvedValue({ data: { user: null } } as never);
++    const res = await POST(request({ code: "abc" }));
++    expect(res.status).toBe(401);
++    expect(appleMock.exchangeAppleCode).not.toHaveBeenCalled();
++  });
++
++  it("400s without a code (missing, blank, or not JSON)", async () => {
++    signedInAs("u-400");
++    expect((await POST(request({}))).status).toBe(400);
++    expect((await POST(request({ code: "  " }))).status).toBe(400);
++    expect((await POST(request("not json"))).status).toBe(400);
++    expect(appleMock.exchangeAppleCode).not.toHaveBeenCalled();
++  });
++
++  it("503s (nothing stored) while APPLE_* is not configured", async () => {
++    signedInAs("u-503");
++    appleMock.appleConfig.mockReturnValue(null);
++    const res = await POST(request({ code: "abc" }));
++    expect(res.status).toBe(503);
++    expect(upsertMock).not.toHaveBeenCalled();
++  });
++
++  it("exchanges the code and stores the refresh token against the session's user", async () => {
++    signedInAs("u-204");
++    const res = await POST(request({ code: " abc " }));
++    expect(res.status).toBe(204);
++    expect(appleMock.exchangeAppleCode).toHaveBeenCalledWith(
++      expect.objectContaining({ clientId: "ai.vasey.vizion" }),
++      "abc",
++    );
++    expect(supabaseMock.from).toHaveBeenCalledWith("apple_refresh_tokens");
++    expect(upsertMock).toHaveBeenCalledWith(
++      expect.objectContaining({ user_id: "u-204", refresh_token: "r1" }),
++    );
++  });
++
++  it("502s when Apple refuses the code, 500s when the row cannot be written", async () => {
++    signedInAs("u-502");
++    appleMock.exchangeAppleCode.mockRejectedValueOnce(new Error("invalid_grant"));
++    expect((await POST(request({ code: "stale" }))).status).toBe(502);
++    expect(upsertMock).not.toHaveBeenCalled();
++
++    signedInAs("u-500");
++    upsertMock.mockResolvedValueOnce({ error: { message: "boom" } });
++    expect((await POST(request({ code: "abc" }))).status).toBe(500);
++  });
++
++  it("429s after five attempts in an hour", async () => {
++    signedInAs("u-429");
++    for (let i = 0; i < 5; i += 1) {
++      expect((await POST(request({ code: `c${i}` }))).status).toBe(204);
++    }
++    expect((await POST(request({ code: "c5" }))).status).toBe(429);
++  });
++});
+diff --git a/tests/unit/delete-account-route.test.ts b/tests/unit/delete-account-route.test.ts
+index 155b83b..b6652de 100644
+--- a/tests/unit/delete-account-route.test.ts
++++ b/tests/unit/delete-account-route.test.ts
+@@ -21,6 +21,14 @@ const storeMock = vi.hoisted(() => ({
+   remove: vi.fn(async () => ({ error: null })),
+ }));
+ const adminMock = vi.hoisted(() => ({
++  // No Sign in with Apple token row for these accounts.
++  from: vi.fn(() => ({
++    select: vi.fn(() => ({
++      eq: vi.fn(() => ({
++        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
++      })),
++    })),
++  })),
+   storage: { from: vi.fn(() => storeMock) },
+   auth: { admin: { deleteUser: vi.fn(async () => ({ error: null })) } },
+ }));
+diff --git a/tests/unit/delete-account.test.ts b/tests/unit/delete-account.test.ts
+new file mode 100644
+index 0000000..9171524
+--- /dev/null
++++ b/tests/unit/delete-account.test.ts
+@@ -0,0 +1,109 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++
++/**
++ * purgeAccount with Sign in with Apple in the picture: the Apple token is
++ * revoked FIRST (Guideline 5.1.1(v)); a failed revoke stops the deletion
++ * while there is still a row to retry from; a missing APPLE_* config is
++ * logged and the deletion goes ahead.
++ */
++const appleMock = vi.hoisted(() => ({
++  appleConfig: vi.fn((): unknown => ({
++    teamId: "T",
++    keyId: "K",
++    clientId: "ai.vasey.vizion",
++    privateKey: "pem",
++  })),
++  revokeAppleToken: vi.fn(async () => {}),
++}));
++vi.mock("@/lib/auth/apple", () => appleMock);
++
++type TokenRead = Promise<{
++  data: { refresh_token: string } | null;
++  error: { message: string } | null;
++}>;
++const tokenRow = vi.hoisted(() => ({
++  maybeSingle: vi.fn((): TokenRead => Promise.resolve({ data: null, error: null })),
++}));
++const storeMock = vi.hoisted(() => ({
++  list: vi.fn(async () => ({ data: [{ name: "asset.png" }], error: null })),
++  remove: vi.fn(async () => ({ error: null })),
++}));
++const adminMock = vi.hoisted(() => ({
++  from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => tokenRow) })) })),
++  storage: { from: vi.fn(() => storeMock) },
++  auth: { admin: { deleteUser: vi.fn(async () => ({ error: null })) } },
++}));
++
++import { purgeAccount } from "@/lib/auth/delete-account";
++
++const admin = adminMock as unknown as Parameters<typeof purgeAccount>[0];
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  vi.spyOn(console, "error").mockImplementation(() => {});
++  tokenRow.maybeSingle.mockResolvedValue({ data: null, error: null });
++  appleMock.appleConfig.mockReturnValue({
++    teamId: "T",
++    keyId: "K",
++    clientId: "ai.vasey.vizion",
++    privateKey: "pem",
++  });
++  appleMock.revokeAppleToken.mockResolvedValue(undefined);
++});
++
++describe("purgeAccount — Sign in with Apple", () => {
++  it("does nothing Apple-related for an account without a token row", async () => {
++    await purgeAccount(admin, "u1");
++    expect(adminMock.from).toHaveBeenCalledWith("apple_refresh_tokens");
++    expect(appleMock.revokeAppleToken).not.toHaveBeenCalled();
++    expect(adminMock.auth.admin.deleteUser).toHaveBeenCalledWith("u1");
++  });
++
++  it("revokes the token before storage or the auth user are touched", async () => {
++    tokenRow.maybeSingle.mockResolvedValue({
++      data: { refresh_token: "r1" },
++      error: null,
++    });
++    await purgeAccount(admin, "u1");
++    expect(appleMock.revokeAppleToken).toHaveBeenCalledWith(
++      expect.objectContaining({ clientId: "ai.vasey.vizion" }),
++      "r1",
++    );
++    const revokedAt = appleMock.revokeAppleToken.mock.invocationCallOrder[0]!;
++    expect(storeMock.remove.mock.invocationCallOrder[0]).toBeGreaterThan(revokedAt);
++    expect(adminMock.auth.admin.deleteUser.mock.invocationCallOrder[0]).toBeGreaterThan(
++      revokedAt,
++    );
++  });
++
++  it("stops before deleting anything when the revoke fails", async () => {
++    tokenRow.maybeSingle.mockResolvedValue({
++      data: { refresh_token: "r1" },
++      error: null,
++    });
++    appleMock.revokeAppleToken.mockRejectedValue(new Error("apple token revoke failed"));
++    await expect(purgeAccount(admin, "u1")).rejects.toThrow("revoke failed");
++    expect(storeMock.remove).not.toHaveBeenCalled();
++    expect(adminMock.auth.admin.deleteUser).not.toHaveBeenCalled();
++  });
++
++  it("stops when the token row cannot be read", async () => {
++    tokenRow.maybeSingle.mockResolvedValue({ data: null, error: { message: "down" } });
++    await expect(purgeAccount(admin, "u1")).rejects.toThrow("apple token read failed");
++    expect(adminMock.auth.admin.deleteUser).not.toHaveBeenCalled();
++  });
++
++  it("deletes anyway, with a logged error, when APPLE_* is not configured", async () => {
++    tokenRow.maybeSingle.mockResolvedValue({
++      data: { refresh_token: "r1" },
++      error: null,
++    });
++    appleMock.appleConfig.mockReturnValue(null);
++    await purgeAccount(admin, "u1");
++    expect(appleMock.revokeAppleToken).not.toHaveBeenCalled();
++    expect(console.error).toHaveBeenCalledWith(
++      expect.stringContaining("APPLE_* not configured"),
++    );
++    expect(adminMock.auth.admin.deleteUser).toHaveBeenCalledWith("u1");
++  });
++});

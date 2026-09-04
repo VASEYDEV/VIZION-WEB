@@ -2,9 +2,10 @@ import Foundation
 import VizionCore
 
 /// The deployed VIZION web app's route handlers are the model proxy (ADR-0002):
-/// `/api/enhance` (SSE), `/api/media` (JSON), `/api/account` (DELETE). Every
-/// request carries the Supabase access token as a Bearer header; the server
-/// verifies it against Supabase Auth before any route runs (ADR-0003).
+/// `/api/enhance` (SSE), `/api/media` (JSON), `/api/account` (DELETE),
+/// `/api/auth/apple` (POST). Every request carries the Supabase access token
+/// as a Bearer header; the server verifies it against Supabase Auth before
+/// any route runs (ADR-0003).
 final class VizionAPI: Sendable {
   typealias TokenProvider = @Sendable () async throws -> String
 
@@ -138,6 +139,31 @@ final class VizionAPI: Sendable {
       fallback: "Extraction failed."
     ) }
     return try JSONDecoder().decode(MediaAnalysisResponse.self, from: data)
+  }
+
+  // MARK: /api/auth/apple
+
+  /// After a Sign in with Apple, hand the server the authorization code from
+  /// the same credential. It exchanges the code for a refresh token and keeps
+  /// it so account deletion can revoke it, as Apple requires (ADR-0006). The
+  /// sign-in itself never depends on this; callers treat a failure as a
+  /// server-configuration gap, not a sign-in error.
+  func registerAppleAuthorization(code: String) async throws {
+    let request = try await request(
+      "POST",
+      path: "/api/auth/apple",
+      body: JSONEncoder().encode(["code": code]),
+      accept: "application/json"
+    )
+    let (data, response) = try await session.data(for: request)
+    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    guard status == 204 || status == 200 else {
+      throw Self.failure(
+        status: status,
+        data: data,
+        fallback: "Couldn't register the Apple sign-in."
+      )
+    }
   }
 
   // MARK: /api/account

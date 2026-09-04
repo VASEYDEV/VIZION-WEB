@@ -6,6 +6,25 @@ All notable changes to VIZION for iOS are documented here. The format follows
 
 ## [Unreleased]
 
+### Added — M6 prep: Sign in with Apple + privacy manifest (2026-09-04)
+
+- **Sign in with Apple** (ADR-0006), the App Store 4.8 counterpart to the
+  Google and GitHub buttons and the first place this app deliberately does
+  more than the web. Native flow: `SignInWithAppleButton` mints the
+  credential, Supabase's id-token grant verifies it. `SignInNonce` (VizionCore,
+  32 random bytes; SHA-256 to Apple, raw to Supabase) makes a token
+  unreplayable. The name Apple sends once seeds `profiles.full_name` and never
+  overwrites a name already there. Closed registration works exactly as for
+  OAuth — an account minted after the stamped attempt is removed again.
+- **`PrivacyInfo.xcprivacy`**: required-reason APIs (UserDefaults `CA92.1`,
+  file timestamp `C617.1`), no tracking, and the six collected data types,
+  matching the App Store Connect labels in the release runbook.
+- **Companion patch `0002-sign-in-with-apple.patch`** for the web repo: the
+  `apple` enum label and `handle_new_user()` mapping, `POST /api/auth/apple`
+  (exchanges Apple's authorization code for a refresh token), and
+  `purgeAccount` revoking that token before it deletes anything — Apple
+  requires revocation on account deletion (guideline 5.1.1(v)).
+
 ### Fixed — CI reconcile + review round (2026-09-04)
 
 - **Build**: `IconView` and `ScreenHeader` initializers are `nonisolated` so a
@@ -65,6 +84,14 @@ All notable changes to VIZION for iOS are documented here. The format follows
   web's per-row rename.
 - **Companion patch**: account deletion stops if the avatar removal reports
   an error, so a public avatar can never outlive its owner's credentials.
+- **Sign-in**: the in-flight `ASWebAuthenticationSession` is retained for the
+  whole OAuth flow, so it can no longer be released mid-flow and leave the
+  form stuck in its busy state.
+- **Result**: a refinement whose diff exceeds the budget shows the result it
+  was seeded from under "Previous result", not the author's original.
+- **Build**: `supabase-swift` is pinned to an exact version in `project.yml`
+  (the generated `Package.resolved` is gitignored, so the pin is the
+  reviewable resolution).
 - **Sign-in (security)**: an account that a Google/GitHub sign-in mints while
   registration is closed is removed again through the companion endpoint and
   signed out — OAuth cannot be told `shouldCreateUser`; the runbook names the

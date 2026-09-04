@@ -92,4 +92,16 @@
   went to the wrong remote and was refused — nothing left the machine). Put
   multi-step verification in a script with `set -euo pipefail`, one command
   per line, and address git with `git -C /absolute/path` — never the cwd.
-
+- **"The web wins" has an escape hatch, and it is an ADR.** Sign in with Apple
+  exists in no web surface, but guideline 4.8 makes it table stakes for the
+  binary. The rule in CLAUDE.md §1 already allows this — write the ADR, say
+  which way the divergence runs, and carry the server half as a companion
+  patch so the two repos stay in step.
+- **A platform requirement usually has a second half.** Offering Sign in with
+  Apple obliges the app to REVOKE Apple's tokens on account deletion, and a
+  revoke needs a refresh token that only the single-use authorization code can
+  buy. Read the whole guideline before calling a feature done.
+- **Verify a vendor API against the vendor's source, not memory.** The
+  id-token call, `OpenIDConnectCredentials` and `Provider.apple` were all read
+  out of supabase-swift 2.55.1 (the pinned tag) before a line was written —
+  the same reconcile the Services layer will need on the first Mac build.

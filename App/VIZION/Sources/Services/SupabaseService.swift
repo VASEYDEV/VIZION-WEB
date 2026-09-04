@@ -114,6 +114,17 @@ final class SupabaseService: Sendable {
     _ = try await client.auth.session(from: callback)
   }
 
+  /// Sign in with Apple, natively: the identity token Apple issued to this
+  /// app goes straight to Supabase, which verifies it against Apple's keys and
+  /// the nonce, then mints (or resumes) the session — no web-auth session, no
+  /// redirect (ADR-0006). The bundle id must be an authorised client id on the
+  /// Apple provider (runbook `supabase-config.md`).
+  func signInWithApple(idToken: String, nonce: String) async throws {
+    _ = try await client.auth.signInWithIdToken(
+      credentials: OpenIDConnectCredentials(provider: .apple, idToken: idToken, nonce: nonce)
+    )
+  }
+
   /// A magic link / OAuth return that arrived through `onOpenURL` instead of
   /// the web-auth session (the link was opened from Mail).
   func completeSignIn(from url: URL) async throws {
@@ -149,6 +160,10 @@ enum WebAuthSession {
   }
 
   private static let context = ContextProvider()
+  /// The in-flight session. ASWebAuthenticationSession must be RETAINED for
+  /// the whole flow — released early it can end without ever calling the
+  /// completion handler, leaving the continuation (and the sign-in form) stuck.
+  private static var active: ASWebAuthenticationSession?
 
   static func run(url: URL, callbackScheme: String) async throws -> URL {
     try await withCheckedThrowingContinuation { continuation in
@@ -156,6 +171,7 @@ enum WebAuthSession {
         url: url,
         callbackURLScheme: callbackScheme
       ) { callback, error in
+        Task { @MainActor in WebAuthSession.active = nil }
         if let callback {
           continuation.resume(returning: callback)
         } else if let error = error as? ASWebAuthenticationSessionError,
@@ -167,7 +183,9 @@ enum WebAuthSession {
       }
       session.presentationContextProvider = context
       session.prefersEphemeralWebBrowserSession = false
+      active = session
       if !session.start() {
+        active = nil
         continuation.resume(throwing: URLError(.cannotConnectToHost))
       }
     }

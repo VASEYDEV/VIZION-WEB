@@ -1,9 +1,10 @@
+import AuthenticationServices
 import SwiftUI
 import VizionCore
 
-/// Auth gate (web: `/sign-in`): the brand hero, the three auth methods, the
-/// brand/version pills, and the footer — over the ambient ground. No DIY
-/// auth: Supabase Auth only.
+/// Auth gate (web: `/sign-in`): the brand hero, the auth methods (plus Sign in
+/// with Apple, native-only — ADR-0006), the brand/version pills, and the
+/// footer — over the ambient ground. No DIY auth: Supabase Auth only.
 struct AuthGateView: View {
   @Environment(AppEnvironment.self) private var env
   /// nil until the settings row answers: signup is CLOSED while unknown, so a
@@ -63,10 +64,14 @@ struct SignInForm: View {
   var signupAllowed: Bool
 
   @Environment(AppEnvironment.self) private var env
+  @Environment(\.colorScheme) private var colorScheme
   @State private var email = ""
   @State private var password = ""
   @State private var withPassword = false
   @State private var status: Status = .idle
+  /// The nonce of the Apple request in flight; its raw value must reach
+  /// Supabase with the token Apple returns for it.
+  @State private var appleNonce: SignInNonce?
   @FocusState private var focus: Field?
 
   private enum Field { case email, password }
@@ -95,6 +100,26 @@ struct SignInForm: View {
 
   private var form: some View {
     VStack(spacing: 12) {
+      // Apple's own button (HIG: its label, mark and colours are not ours to
+      // restyle); black on light, white on dark, the control radius.
+      SignInWithAppleButton(.continue) { request in
+        let nonce = SignInNonce.make()
+        appleNonce = nonce
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = nonce.hashed
+        // Stamp the attempt BEFORE Apple's sheet, as for OAuth: an account
+        // created after this instant is one this flow minted.
+        env.oauthAttemptStartedAt = Date()
+        status = .sending
+      } onCompletion: { result in
+        Task { await completeApple(result) }
+      }
+      .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+      .frame(height: 44)
+      .clipShape(RoundedRectangle(cornerRadius: VZ.Radius.control, style: .continuous))
+      .disabled(busy)
+      .accessibilityLabel("Continue with Apple")
+
       ForEach(SupabaseService.OAuthProvider.allCases, id: \.self) { provider in
         Button {
           Task { await signIn(with: provider) }
@@ -164,7 +189,7 @@ struct SignInForm: View {
         Text(
           """
           New registrations are currently closed. Existing accounts can still sign in; \
-          a Google or GitHub sign-in cannot create a new one.
+          an Apple, Google or GitHub sign-in cannot create a new one.
           """
         )
         .font(.vzBody(12))
@@ -241,6 +266,63 @@ struct SignInForm: View {
       env.oauthAttemptStartedAt = nil
       status = .error(error.localizedDescription)
     }
+  }
+
+  /// The Apple sheet closed: hand the identity token (and the nonce it was
+  /// minted for) to Supabase. Apple's cancel is a plain return to idle, as
+  /// backing out of an OAuth consent screen is.
+  private func completeApple(_ result: Result<ASAuthorization, any Error>) async {
+    guard let supabase = env.supabase else { return }
+    let nonce = appleNonce
+    appleNonce = nil
+    switch result {
+    case let .success(authorization):
+      guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+            let tokenData = credential.identityToken,
+            let idToken = String(data: tokenData, encoding: .utf8),
+            let nonce
+      else {
+        env.oauthAttemptStartedAt = nil
+        status = .error("Apple did not return a usable credential — please try again.")
+        return
+      }
+      do {
+        try await supabase.signInWithApple(idToken: idToken, nonce: nonce.raw)
+        status = .idle
+        // Apple sends the name once, on the first authorisation, and only to
+        // the app: the token has no name for the server to copy.
+        if let name = credential.fullName.flatMap(Self.displayName) {
+          await env.seedFullName(name)
+        }
+        // The authorization code lets the server hold a revocable token for
+        // account deletion (ADR-0006). Best effort: a server without the
+        // companion patch answers 404 and the sign-in stands regardless.
+        if let codeData = credential.authorizationCode,
+           let code = String(data: codeData, encoding: .utf8),
+           let api = env.api {
+          try? await api.registerAppleAuthorization(code: code)
+        }
+      } catch {
+        env.oauthAttemptStartedAt = nil
+        status = .error(error.localizedDescription)
+      }
+    case let .failure(error):
+      env.oauthAttemptStartedAt = nil
+      if let authError = error as? ASAuthorizationError, authError.code == .canceled {
+        status = .idle
+      } else {
+        status = .error(error.localizedDescription)
+      }
+    }
+  }
+
+  /// "Given Family" in the user's locale order; nil when Apple sent no name.
+  private static func displayName(from components: PersonNameComponents) -> String? {
+    let text = PersonNameComponentsFormatter.localizedString(
+      from: components, style: .default, options: []
+    )
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
   }
 
   /// Human copy for the machine slugs the auth callback emits.

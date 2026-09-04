@@ -31,5 +31,5 @@ Expect an acknowledgement within 72 hours.
 
 ## Dependencies
 
-`supabase-swift` (2.x). Review `Package.resolved` on every bump; CI builds the
+`supabase-swift` (2.x). It is pinned to an exact version in `project.yml` (`exactVersion`), so every bump is an explicit, reviewable line change; CI builds the
 core on Linux and the app on macOS.

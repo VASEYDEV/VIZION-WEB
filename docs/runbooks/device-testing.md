@@ -6,6 +6,9 @@
   A release Xcode cannot target a newer beta OS.
 - Your Apple Developer team id in `Config/Secrets.xcconfig` (`VIZION_TEAM_ID`).
 - Developer Mode enabled on the iPhone (Settings → Privacy & Security → Developer Mode).
+- Sign in with Apple configured (App ID capability + Supabase client id) — see
+  `supabase-config.md`. It is the one method the simulator cannot exercise
+  against a real Apple ID.
 - The companion patch deployed to the web app (a Vercel preview is enough) and
   `VIZION_API_BASE_URL` pointing at it.
 - `vizion://auth/callback` allowed in Supabase (see `supabase-config.md`).
@@ -16,7 +19,12 @@
    certificate on the phone (Settings → General → VPN & Device Management).
 2. **Sign in.** Try magic link (open the mail on the phone — the link returns
    to the app via `vizion://auth/callback`), then Google and GitHub (system
-   web-auth sheet), then password.
+   web-auth sheet), then password, then **Apple** (the system sheet, no browser
+   round trip). On a first Apple authorisation check that Settings → Identity
+   shows the name Apple sent and Connection reads "Connected with Apple"; then
+   sign out and back in with Apple to confirm the second run mints nothing new.
+   To re-test the first-run path, revoke the app under Settings → your name →
+   Sign in with Apple.
 3. **Enhance.** Pick a target whose key is configured on the server; run a
    Clarify. Watch the ticker climb and the result land. Try a refine chip, a
    Polish with per-change revert, a Reformat with a shape, Auto with each budget.

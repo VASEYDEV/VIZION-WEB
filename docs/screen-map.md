@@ -3,7 +3,7 @@
 | Web (SeanVasey/vizion) | iOS | Notes |
 | --- | --- | --- |
 | `middleware.ts` + `(app)/layout.tsx` gate | `AppEnvironment.gate` → `RootView` | config · session · onboarding · closed-access |
-| `(auth)/sign-in` + `AuthHero` + `SignInForm` | `AuthGateView` · `AuthHero` · `SignInForm` | Google/GitHub via `ASWebAuthenticationSession`; magic link; password |
+| `(auth)/sign-in` + `AuthHero` + `SignInForm` | `AuthGateView` · `AuthHero` · `SignInForm` | Google/GitHub via `ASWebAuthenticationSession`; magic link; password; **plus** Sign in with Apple, native-only (ADR-0006) |
 | `(auth)/set-password` + `SetPasswordForm` | `SetPasswordView` | `PasswordRule` shared |
 | `ScreenHeader` / `BottomNav` / `NewPromptFab` | `ScreenHeader` · `MainTabView` (TabView) · `NewPromptButton` | Tab icons are the web's strokes as template images |
 | `(app)/enhance` + `EnhanceComposer` | `EnhanceScreen` · `EnhanceComposer` · `EnhanceViewModel` | |

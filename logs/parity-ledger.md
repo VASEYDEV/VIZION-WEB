@@ -10,7 +10,7 @@ Legend: ✅ ported · 🟡 partial / simplified · ⬜ not yet · ➖ not applic
 | GitHub / Google OAuth (PKCE) | ✅ | `ASWebAuthenticationSession` |
 | Set-password onboarding gate | ✅ | |
 | Closed-access (owner switch) | ✅ | owner = recorded claimant only; `OWNER_EMAIL` env is server-only |
-| Sign in with Apple | ⬜ | M6 review decision (guideline 4.8) |
+| Sign in with Apple | ✅ | Native id-token grant (ADR-0006) — the app does MORE than the web here (guideline 4.8) |
 | Session refresh ≤ 7 d | ✅ | SDK |
 
 ## Enhance

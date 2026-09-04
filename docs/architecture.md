@@ -36,8 +36,11 @@ writes under RLS, storage) the app does directly too, through `supabase-swift`.
 configMissing → loading → signedOut → needsPassword → closed → app
 ```
 
-- `signedOut`: no Keychain session → `AuthGateView`.
+- `signedOut`: no Keychain session → `AuthGateView` (magic link, password,
+  Google/GitHub via `ASWebAuthenticationSession`, and Sign in with Apple
+  through Supabase's id-token grant — ADR-0006, native-only).
 - `needsPassword`: `profiles.auth_method = magic_link ∧ password_set = false`.
+  Apple, like the other providers, is never gated — the provider is the credential.
 - `closed`: `app_settings.open_access = false` and the user is not the recorded owner.
 - Every `/api/*` request carries `Authorization: Bearer <access_token>`; the SDK
   refreshes before handing out a token, so the server never sees a stale one.

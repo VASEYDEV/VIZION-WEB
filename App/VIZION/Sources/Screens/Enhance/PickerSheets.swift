@@ -168,6 +168,20 @@ struct ProviderMark: View {
   }
 }
 
+/// The Apple mark for the Settings connection badge — the SF Symbol, which is
+/// the one form Apple licenses for "signed in with Apple" contexts.
+struct AppleMark: View {
+  var size: CGFloat = 18
+
+  var body: some View {
+    Image(systemName: "apple.logo")
+      .font(.system(size: size * 0.85, weight: .medium))
+      .foregroundStyle(VZ.text)
+      .frame(width: size, height: size)
+      .accessibilityHidden(true)
+  }
+}
+
 enum ProviderPaths {
   struct Piece {
     let color: Color
