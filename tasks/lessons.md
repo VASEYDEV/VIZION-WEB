@@ -58,4 +58,13 @@
   body only, so moving a coherent section (the attachment pipeline) into a
   same-file extension keeps `private` access and drops the count honestly;
   raising the limit would have hidden it.
+- **`nonisolated init` needs Sendable stored properties.** Under SE-0434 only
+  Sendable stored properties of a main-actor `View` are nonisolated; a struct
+  holding a generic child view (`action: Action`) cannot assign it from a
+  nonisolated init. Reserve `nonisolated init` for leaf views built inside
+  nonisolated builder closures (`IconView`), never for containers.
+- **Splitting a type across files changes access.** A same-file extension sees
+  `private`; a `+Drafts.swift` extension does not. When moving members out,
+  grep the moved code for every `private` it touches (`client` was missed) and
+  lift those to internal in the same commit.
 
