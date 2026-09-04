@@ -13,5 +13,6 @@ public enum VizionBrand {
   public static let defaultAPIBase = URL(string: "https://vizion-io.vercel.app")!
   public static let repository = URL(string: "https://github.com/vaseydev/vizion-web")!
   public static let acknowledgements =
-    "Type: Bebas Neue, Reddit Sans, and JetBrains Mono (SIL Open Font License). Developer marks via thesvg.org and Simple Icons. Built on Supabase."
+    "Type: Bebas Neue, Reddit Sans, and JetBrains Mono (SIL Open Font License). "
+      + "Developer marks via thesvg.org and Simple Icons. Built on Supabase."
 }

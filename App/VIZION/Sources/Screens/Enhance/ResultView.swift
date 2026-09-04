@@ -16,9 +16,17 @@ struct ResultView: View {
   @State private var answers: [String] = []
   @State private var savedID: String?
 
-  private var result: EnhanceResult { view.result }
-  private var hunks: [WordDiff.Hunk] { result.diff.map(WordDiff.hunks) ?? [] }
-  private var reviewable: Bool { view.submitted.mode == .polish && !hunks.isEmpty }
+  private var result: EnhanceResult {
+    view.result
+  }
+
+  private var hunks: [WordDiff.Hunk] {
+    result.diff.map(WordDiff.hunks) ?? []
+  }
+
+  private var reviewable: Bool {
+    view.submitted.mode == .polish && !hunks.isEmpty
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -26,9 +34,21 @@ struct ResultView: View {
       outputPanel
       primaryActions
       meta
-      if result.truncated == true { note("The model hit its output ceiling — this result is incomplete.", tone: VZ.amberInk) }
-      if result.salvaged == true { note("Recovered from a malformed response; the explanation was lost.", tone: VZ.muted) }
-      if !result.rationale.isEmpty { section("What changed") { Text(result.rationale) } }
+      if result.truncated == true {
+        note(
+          "The model hit its output ceiling — this result is incomplete.",
+          tone: VZ.amberInk
+        )
+      }
+      if result.salvaged == true {
+        note(
+          "Recovered from a malformed response; the explanation was lost.",
+          tone: VZ.muted
+        )
+      }
+      if !result.rationale.isEmpty {
+        section("What changed") { Text(result.rationale) }
+      }
       if let assumptions = result.assumptions, !assumptions.isEmpty {
         section("Assumptions") {
           VStack(alignment: .leading, spacing: 4) {
@@ -36,10 +56,17 @@ struct ResultView: View {
           }
         }
       }
-      if let notes = result.targetNotes, !notes.isEmpty { section("For \(view.effectiveTarget.label)") { Text(notes) } }
-      if let questions = result.questions, !questions.isEmpty { questionsCard(questions) }
+      if let notes = result.targetNotes,
+         !notes.isEmpty {
+        section("For \(view.effectiveTarget.label)") { Text(notes) }
+      }
+      if let questions = result.questions, !questions.isEmpty {
+        questionsCard(questions)
+      }
       refineChips
-      if reviewable { reviewPanel }
+      if reviewable {
+        reviewPanel
+      }
       originalPanel
     }
     .padding(16)
@@ -72,7 +99,12 @@ struct ResultView: View {
   private var outputPanel: some View {
     Group {
       if let diff = result.diff, !diff.isEmpty {
-        DiffText(segments: diff, side: .output, rejected: view.rejectedSet, hunkIDs: WordDiff.assignHunks(diff))
+        DiffText(
+          segments: diff,
+          side: .output,
+          rejected: view.rejectedSet,
+          hunkIDs: WordDiff.assignHunks(diff)
+        )
       } else {
         Text(view.effectiveOutput)
       }
@@ -88,10 +120,14 @@ struct ResultView: View {
   private var primaryActions: some View {
     VStack(spacing: 10) {
       HStack(spacing: 10) {
-        Button { model.copyOutput() } label: { HStack(spacing: 6) { IconView(.copy, size: 16); Text("Copy") } }
-          .buttonStyle(.laser)
-        Button { model.useAsDraft() } label: { HStack(spacing: 6) { IconView(.paste, size: 16); Text("Use") } }
-          .buttonStyle(.secondary)
+        Button { model.copyOutput() } label: {
+          HStack(spacing: 6) { IconView(.copy, size: 16); Text("Copy") }
+        }
+        .buttonStyle(.laser)
+        Button { model.useAsDraft() } label: {
+          HStack(spacing: 6) { IconView(.paste, size: 16); Text("Use") }
+        }
+        .buttonStyle(.secondary)
       }
       HStack(spacing: 10) {
         if let savedID {
@@ -102,7 +138,10 @@ struct ResultView: View {
           }
           .buttonStyle(.secondary)
         } else {
-          Button { showSave = true } label: { HStack(spacing: 6) { IconView(.library, size: 16); Text("Save") } }
+          Button { showSave = true } label: { HStack(spacing: 6) { IconView(
+            .library,
+            size: 16
+          ); Text("Save") } }
             .buttonStyle(.secondary)
         }
         ShareLink(item: view.effectiveOutput) {
@@ -110,13 +149,17 @@ struct ResultView: View {
         }
         .buttonStyle(.secondary)
         .simultaneousGesture(TapGesture().onEnded {
-          if let savedID { Task { try? await env.library?.logShare(promptID: savedID) } }
+          if let savedID {
+            Task { try? await env.library?.logShare(promptID: savedID) }
+          }
         })
         exportMenu
       }
     }
     .onReceive(NotificationCenter.default.publisher(for: .vizionPromptSaved)) { note in
-      if let id = note.object as? String { savedID = id }
+      if let id = note.object as? String {
+        savedID = id
+      }
     }
   }
 
@@ -124,7 +167,10 @@ struct ResultView: View {
     Menu {
       if let data = model.exportData() {
         ForEach(ExportFormat.allCases) { format in
-          ShareLink(item: ExportFile(text: format.render(data), format: format), preview: SharePreview("VIZION export.\(format.fileExtension)")) {
+          ShareLink(
+            item: ExportFile(text: format.render(data), format: format),
+            preview: SharePreview("VIZION export.\(format.fileExtension)")
+          ) {
             Label(format.label, systemImage: "doc")
           }
         }
@@ -151,13 +197,19 @@ struct ResultView: View {
   }
 
   private func note(_ text: String, tone: Color) -> some View {
-    Text(text).font(.vzBody(12)).foregroundStyle(tone).frame(maxWidth: .infinity, alignment: .leading)
+    Text(text).font(.vzBody(12)).foregroundStyle(tone).frame(
+      maxWidth: .infinity,
+      alignment: .leading
+    )
   }
 
   private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       Text(title).vzCaps()
-      content().font(.vzBody(14)).foregroundStyle(VZ.text).frame(maxWidth: .infinity, alignment: .leading)
+      content().font(.vzBody(14)).foregroundStyle(VZ.text).frame(
+        maxWidth: .infinity,
+        alignment: .leading
+      )
     }
   }
 
@@ -169,7 +221,11 @@ struct ResultView: View {
           Text(question).font(.vzBody(14, .medium)).foregroundStyle(VZ.text)
           TextField("Your answer", text: Binding(
             get: { i < answers.count ? answers[i] : "" },
-            set: { if i < answers.count { answers[i] = $0 } }
+            set: {
+              if i < answers.count {
+                answers[i] = $0
+              }
+            }
           ))
           .vzInputFont().vzField()
         }
@@ -225,7 +281,11 @@ struct ResultView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Button(rejected ? "Keep" : "Revert") {
               var next = view.rejectedSet
-              if rejected { next.remove(hunk.index) } else { next.insert(hunk.index) }
+              if rejected {
+                next.remove(hunk.index)
+              } else {
+                next.insert(hunk.index)
+              }
               model.setRejected(next)
             }
             .buttonStyle(.secondaryInline)
@@ -243,7 +303,10 @@ struct ResultView: View {
         withAnimation(VZ.Motion.quickAnimation) { showOriginal.toggle() }
       } label: {
         HStack {
-          SectionCaption(text: view.refined == true ? "Previous result" : "Original", icon: .history)
+          SectionCaption(
+            text: view.refined == true ? "Previous result" : "Original",
+            icon: .history
+          )
           Spacer()
           IconView(showOriginal ? .chevronDown : .chevronRight, size: 14)
         }
@@ -252,7 +315,12 @@ struct ResultView: View {
       if showOriginal {
         Group {
           if let diff = result.diff, !diff.isEmpty {
-            DiffText(segments: diff, side: .input, rejected: view.rejectedSet, hunkIDs: WordDiff.assignHunks(diff))
+            DiffText(
+              segments: diff,
+              side: .input,
+              rejected: view.rejectedSet,
+              hunkIDs: WordDiff.assignHunks(diff)
+            )
           } else {
             Text(view.submitted.input)
           }
@@ -337,11 +405,15 @@ struct SavePromptSheet: View {
         .textInputAutocapitalization(.never)
       if let duplicate {
         VStack(alignment: .leading, spacing: 8) {
-          Text("This is already in your library as “\(duplicate.title)”.").font(.vzBody(13)).foregroundStyle(VZ.muted)
-          Button("Save as new version") { Task { await addVersion(to: duplicate.id) } }.buttonStyle(.secondary)
+          Text("This is already in your library as “\(duplicate.title)”.").font(.vzBody(13))
+            .foregroundStyle(VZ.muted)
+          Button("Save as new version") { Task { await addVersion(to: duplicate.id) } }
+            .buttonStyle(.secondary)
         }
       }
-      if let error { Text(error).font(.vzBody(13)).foregroundStyle(VZ.flare) }
+      if let error {
+        Text(error).font(.vzBody(13)).foregroundStyle(VZ.flare)
+      }
       Button(saving ? "Saving…" : "Save") { Task { await save() } }
         .buttonStyle(.laser).disabled(saving)
       Button("Cancel") { dismiss() }.buttonStyle(.quiet)

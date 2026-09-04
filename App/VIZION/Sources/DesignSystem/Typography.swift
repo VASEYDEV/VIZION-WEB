@@ -33,7 +33,11 @@ extension Font {
     .custom(VZFont.displayName, size: size, relativeTo: style)
   }
 
-  static func vzBody(_ size: CGFloat = 15, _ weight: VZFont.Weight = .regular, relativeTo style: TextStyle = .body) -> Font {
+  static func vzBody(
+    _ size: CGFloat = 15,
+    _ weight: VZFont.Weight = .regular,
+    relativeTo style: TextStyle = .body
+  ) -> Font {
     .custom(weight.postScriptName, size: size, relativeTo: style)
   }
 

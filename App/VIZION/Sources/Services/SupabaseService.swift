@@ -45,7 +45,7 @@ final class SupabaseService: Sendable {
 
   /// The current session, refreshed by the SDK when it is about to expire.
   func session() async throws -> SessionInfo {
-    SessionInfo(try await client.auth.session)
+    try await SessionInfo(client.auth.session)
   }
 
   /// A fresh access token for the Vercel API's Bearer header.
@@ -148,10 +148,14 @@ enum WebAuthSession {
 
   static func run(url: URL, callbackScheme: String) async throws -> URL {
     try await withCheckedThrowingContinuation { continuation in
-      let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { callback, error in
+      let session = ASWebAuthenticationSession(
+        url: url,
+        callbackURLScheme: callbackScheme
+      ) { callback, error in
         if let callback {
           continuation.resume(returning: callback)
-        } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+        } else if let error = error as? ASWebAuthenticationSessionError,
+                  error.code == .canceledLogin {
           continuation.resume(throwing: CancellationError())
         } else {
           continuation.resume(throwing: error ?? URLError(.unknown))

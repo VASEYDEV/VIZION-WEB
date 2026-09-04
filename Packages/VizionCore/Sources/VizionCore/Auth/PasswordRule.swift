@@ -12,11 +12,19 @@ public enum PasswordRule {
   /// nil when acceptable, otherwise a sentence to show the user. NOT trimmed —
   /// leading/trailing spaces are legitimate password characters.
   public static func validate(_ password: String) -> String? {
-    if password.count < minLength { return "Use at least \(minLength) characters." }
+    if password.count < minLength {
+      return "Use at least \(minLength) characters."
+    }
     var missing: [String] = []
-    if !password.contains(where: { $0.isLowercase }) { missing.append("a lowercase letter") }
-    if !password.contains(where: { $0.isUppercase }) { missing.append("an uppercase letter") }
-    if !password.contains(where: { $0.isNumber }) { missing.append("a number") }
+    if !password.contains(where: \.isLowercase) {
+      missing.append("a lowercase letter")
+    }
+    if !password.contains(where: \.isUppercase) {
+      missing.append("an uppercase letter")
+    }
+    if !password.contains(where: \.isNumber) {
+      missing.append("a number")
+    }
     guard !missing.isEmpty else { return nil }
     let list = missing.count == 1
       ? missing[0]

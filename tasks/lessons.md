@@ -30,3 +30,32 @@
 - **Keep the design tokens as code, sourced from the locked CSS**, with the exact
   light/dark pairs. The contrast law (on-laser ink on Laser; `accent` for Laser-
   as-text) is the rule most likely to be broken by a "quick" colour change.
+
+## 2026-09-04 — First CI round (PR #1)
+
+- **Fetch the real linters before "fixing" lint blind.** The Linux SwiftLint
+  asset is `swiftlint_linux_amd64.zip` (not `swiftlint_linux.zip`); one wrong
+  URL cost a full CI round of guessed rule behaviour. Guessing was wrong twice.
+- **SwiftLint's disable-command rules are on by default.** A file-top
+  `// swiftlint:disable x` with no matching `enable` is `blanket_disable_command`;
+  every word after the rule name parses as another rule id and fires
+  `superfluous_disable_command`. Use tight `disable`/`enable` regions or
+  `:next`/`:this`, and never put prose on the command line.
+- **`:next` can't cross a doc comment.** A `// swiftlint:disable:next` between a
+  `///` block and its declaration orphans the doc (`orphaned_doc_comment`) and
+  misses the target; put `// swiftlint:disable:this` on the declaration line.
+- **SE-0434 bites view inits.** An explicit `init` on a `View` struct is
+  main-actor-isolated; the implicit memberwise one is not. Any view constructed
+  inside a nonisolated builder closure (`PhotosPicker` label) needs
+  `nonisolated init` — the same shape SwiftUI's own containers use.
+- **Format first, then lint.** SwiftFormat rewraps at 100 columns and SwiftLint
+  measures at 110; hand-counting columns before formatting is wasted work, and
+  `let`-hoisting a `String(format:)` beats a `specifier:` interpolation that
+  cannot be split.
+- **Two closures → label the second.** `multiple_closures_with_trailing_closure`
+  is default-on; a helper that takes `rollback:` and work needs `work:` too.
+- **Split by extension, not by config.** `type_body_length` counts the type
+  body only, so moving a coherent section (the attachment pipeline) into a
+  same-file extension keeps `private` access and drops the count honestly;
+  raising the limit would have hidden it.
+

@@ -63,8 +63,24 @@ struct MainTabView: View {
       }
     }
     .tint(VZ.accent)
-    .onChange(of: env.pendingPromptID) { _, id in if id != nil { tab = .library } }
-    .onChange(of: env.pendingDraft) { _, draft in if draft != nil { tab = .enhance } }
+    // `initial: true`: a link that arrived while signed out (or before this
+    // view existed) is already pending when the modifier attaches.
+    .onChange(of: env.pendingTab, initial: true) { _, next in
+      if let next {
+        tab = next
+        env.pendingTab = nil
+      }
+    }
+    .onChange(of: env.pendingPromptID, initial: true) { _, id in
+      if id != nil {
+        tab = .library
+      }
+    }
+    .onChange(of: env.pendingDraft, initial: true) { _, draft in
+      if draft != nil {
+        tab = .enhance
+      }
+    }
   }
 }
 
@@ -102,10 +118,15 @@ struct AccessClosedView: View {
         Text("Access is closed")
           .font(.vzDisplay(28))
           .foregroundStyle(VZ.text)
-        Text("The owner has temporarily closed VIZION to other accounts. Your data is safe and will be here when access reopens.")
-          .font(.vzBody(14))
-          .foregroundStyle(VZ.muted)
-          .multilineTextAlignment(.center)
+        Text(
+          """
+          The owner has temporarily closed VIZION to other accounts. \
+          Your data is safe and will be here when access reopens.
+          """
+        )
+        .font(.vzBody(14))
+        .foregroundStyle(VZ.muted)
+        .multilineTextAlignment(.center)
         Button("Sign out") { Task { await env.signOut() } }
           .buttonStyle(.secondary)
           .padding(.top, 8)
@@ -128,7 +149,9 @@ extension VZIcon {
     private var images: [VZIcon: UIImage] = [:]
 
     func image(for icon: VZIcon) -> UIImage {
-      if let cached = images[icon] { return cached }
+      if let cached = images[icon] {
+        return cached
+      }
       let size = CGSize(width: 24, height: 24)
       let renderer = UIGraphicsImageRenderer(size: size)
       let image = renderer.image { context in

@@ -19,6 +19,9 @@ public struct SVGPathParseError: Error, Sendable, Hashable {
 }
 
 public enum SVGPathParser {
+  // The command switch IS the grammar; splitting it per letter would scatter
+  // the shared cursor/control-point state across a dozen functions.
+  // swiftlint:disable:next cyclomatic_complexity function_body_length
   public static func parse(_ d: String) throws -> [SVGPathCommand] {
     var scanner = Scanner(Array(d.utf8))
     var commands: [SVGPathCommand] = []
@@ -39,7 +42,9 @@ public enum SVGPathParser {
           let px = isRelative ? current.x + x : x
           let py = isRelative ? current.y + y : y
           commands.append(first ? .move(x: px, y: py) : .line(x: px, y: py))
-          if first { subpathStart = (px, py) }
+          if first {
+            subpathStart = (px, py)
+          }
           current = (px, py)
           first = false
         } while scanner.hasNumber()
@@ -69,7 +74,9 @@ public enum SVGPathParser {
       case 67: // C
         repeat {
           var p = [Double]()
-          for _ in 0..<6 { p.append(try scanner.number()) }
+          for _ in 0 ..< 6 {
+            try p.append(scanner.number())
+          }
           let base: (x: Double, y: Double) = isRelative ? current : (x: 0, y: 0)
           let c1 = (base.x + p[0], base.y + p[1])
           let c2 = (base.x + p[2], base.y + p[3])
@@ -81,15 +88,17 @@ public enum SVGPathParser {
       case 83: // S
         repeat {
           var p = [Double]()
-          for _ in 0..<4 { p.append(try scanner.number()) }
+          for _ in 0 ..< 4 {
+            try p.append(scanner.number())
+          }
           let base: (x: Double, y: Double) = isRelative ? current : (x: 0, y: 0)
-          let c1: (Double, Double)
-          if lastCommand == 67 || lastCommand == 99 || lastCommand == 83 || lastCommand == 115,
-            let lc = lastControl
-          {
-            c1 = (2 * current.x - lc.x, 2 * current.y - lc.y)
+          let c1: (Double, Double) = if lastCommand == 67 || lastCommand == 99 || lastCommand ==
+            83 ||
+            lastCommand == 115,
+            let lc = lastControl {
+            (2 * current.x - lc.x, 2 * current.y - lc.y)
           } else {
-            c1 = (current.x, current.y)
+            (current.x, current.y)
           }
           let c2 = (base.x + p[0], base.y + p[1])
           let end = (base.x + p[2], base.y + p[3])
@@ -100,7 +109,9 @@ public enum SVGPathParser {
       case 81: // Q
         repeat {
           var p = [Double]()
-          for _ in 0..<4 { p.append(try scanner.number()) }
+          for _ in 0 ..< 4 {
+            try p.append(scanner.number())
+          }
           let base: (x: Double, y: Double) = isRelative ? current : (x: 0, y: 0)
           let c = (base.x + p[0], base.y + p[1])
           let end = (base.x + p[2], base.y + p[3])
@@ -113,13 +124,13 @@ public enum SVGPathParser {
           let x = try scanner.number()
           let y = try scanner.number()
           let base: (x: Double, y: Double) = isRelative ? current : (x: 0, y: 0)
-          let c: (Double, Double)
-          if lastCommand == 81 || lastCommand == 113 || lastCommand == 84 || lastCommand == 116,
-            let lc = lastControl
-          {
-            c = (2 * current.x - lc.x, 2 * current.y - lc.y)
+          let c: (Double, Double) = if lastCommand == 81 || lastCommand == 113 || lastCommand ==
+            84 ||
+            lastCommand == 116,
+            let lc = lastControl {
+            (2 * current.x - lc.x, 2 * current.y - lc.y)
           } else {
-            c = (current.x, current.y)
+            (current.x, current.y)
           }
           let end = (base.x + x, base.y + y)
           commands.append(.quad(x1: c.0, y1: c.1, x: end.0, y: end.1))
@@ -140,7 +151,8 @@ public enum SVGPathParser {
             contentsOf: Self.arcToCubics(
               from: current, rx: rx, ry: ry, rotationDegrees: rotation, largeArc: largeArc,
               sweep: sweep, to: end
-            ))
+            )
+          )
           current = end
         } while scanner.hasNumber()
         lastControl = nil
@@ -149,7 +161,10 @@ public enum SVGPathParser {
         current = subpathStart
         lastControl = nil
       default:
-        throw SVGPathParseError(message: "Unknown command \(Character(UnicodeScalar(cmd)))", offset: scanner.index)
+        throw SVGPathParseError(
+          message: "Unknown command \(Character(UnicodeScalar(cmd)))",
+          offset: scanner.index
+        )
       }
       lastCommand = cmd
     }
@@ -157,15 +172,19 @@ public enum SVGPathParser {
   }
 
   /// SVG 1.1 F.6.5 endpoint → center parameterization, then one cubic per
-  /// ≤90° slice.
-  static func arcToCubics(
+  /// ≤90° slice. Seven parameters because that is the arc command's arity.
+  static func arcToCubics( // swiftlint:disable:this function_parameter_count
     from p1: (x: Double, y: Double), rx rxIn: Double, ry ryIn: Double, rotationDegrees: Double,
     largeArc: Bool, sweep: Bool, to p2: (x: Double, y: Double)
   ) -> [SVGPathCommand] {
-    if p1.x == p2.x, p1.y == p2.y { return [] }
+    if p1.x == p2.x, p1.y == p2.y {
+      return []
+    }
     var rx = abs(rxIn)
     var ry = abs(ryIn)
-    if rx == 0 || ry == 0 { return [.line(x: p2.x, y: p2.y)] }
+    if rx == 0 || ry == 0 {
+      return [.line(x: p2.x, y: p2.y)]
+    }
     let phi = rotationDegrees * .pi / 180
     let cosPhi = cos(phi)
     let sinPhi = sin(phi)
@@ -182,7 +201,8 @@ public enum SVGPathParser {
     let ry2 = ry * ry
     let num = rx2 * ry2 - rx2 * y1p * y1p - ry2 * x1p * x1p
     let den = rx2 * y1p * y1p + ry2 * x1p * x1p
-    let coef = (largeArc != sweep ? 1.0 : -1.0) * (den == 0 ? 0 : Swift.max(0, num / den).squareRoot())
+    let coef = (largeArc != sweep ? 1.0 : -1.0) *
+      (den == 0 ? 0 : Swift.max(0, num / den).squareRoot())
     let cxp = coef * (rx * y1p / ry)
     let cyp = coef * -(ry * x1p / rx)
     let cx = cosPhi * cxp - sinPhi * cyp + (p1.x + p2.x) / 2
@@ -193,13 +213,19 @@ public enum SVGPathParser {
       let len = ((ux * ux + uy * uy) * (vx * vx + vy * vy)).squareRoot()
       guard len > 0 else { return 0 }
       var a = acos(Swift.max(-1, Swift.min(1, dot / len)))
-      if ux * vy - uy * vx < 0 { a = -a }
+      if ux * vy - uy * vx < 0 {
+        a = -a
+      }
       return a
     }
     let theta1 = angle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry)
     var delta = angle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry)
-    if !sweep, delta > 0 { delta -= 2 * .pi }
-    if sweep, delta < 0 { delta += 2 * .pi }
+    if !sweep, delta > 0 {
+      delta -= 2 * .pi
+    }
+    if sweep, delta < 0 {
+      delta += 2 * .pi
+    }
 
     let segments = Swift.max(1, Int((abs(delta) / (.pi / 2)).rounded(.up)))
     let step = delta / Double(segments)
@@ -208,7 +234,7 @@ public enum SVGPathParser {
     func map(_ ux: Double, _ uy: Double) -> (Double, Double) {
       (cx + rx * ux * cosPhi - ry * uy * sinPhi, cy + rx * ux * sinPhi + ry * uy * cosPhi)
     }
-    for i in 0..<segments {
+    for i in 0 ..< segments {
       let a1 = theta1 + Double(i) * step
       let a2 = a1 + step
       let c1u = (cos(a1) - t * sin(a1), sin(a1) + t * cos(a1))
@@ -223,7 +249,8 @@ public enum SVGPathParser {
   }
 
   /// Axis-aligned bounds of the parsed geometry (control points included).
-  public static func bounds(_ commands: [SVGPathCommand]) -> (minX: Double, minY: Double, maxX: Double, maxY: Double)? {
+  public static func bounds(_ commands: [SVGPathCommand])
+    -> (minX: Double, minY: Double, maxX: Double, maxY: Double)? {
     var minX = Double.infinity, minY = Double.infinity
     var maxX = -Double.infinity, maxY = -Double.infinity
     func include(_ x: Double, _ y: Double) {
@@ -252,12 +279,13 @@ public enum SVGPathParser {
     let bytes: [UInt8]
     var index = 0
 
-    init(_ bytes: [UInt8]) { self.bytes = bytes }
+    init(_ bytes: [UInt8]) {
+      self.bytes = bytes
+    }
 
     mutating func skipSeparators() {
       while index < bytes.count, bytes[index] == 32 || bytes[index] == 44 || bytes[index] == 9
-        || bytes[index] == 10 || bytes[index] == 13
-      {
+        || bytes[index] == 10 || bytes[index] == 13 {
         index += 1
       }
     }
@@ -275,8 +303,7 @@ public enum SVGPathParser {
     func hasNumber() -> Bool {
       var i = index
       while i < bytes.count, bytes[i] == 32 || bytes[i] == 44 || bytes[i] == 9 || bytes[i] == 10
-        || bytes[i] == 13
-      {
+        || bytes[i] == 13 {
         i += 1
       }
       guard i < bytes.count else { return false }
@@ -287,7 +314,9 @@ public enum SVGPathParser {
     mutating func number() throws -> Double {
       skipSeparators()
       let start = index
-      if index < bytes.count, bytes[index] == 45 || bytes[index] == 43 { index += 1 }
+      if index < bytes.count, bytes[index] == 45 || bytes[index] == 43 {
+        index += 1
+      }
       var sawDigit = false
       while index < bytes.count, bytes[index] >= 48, bytes[index] <= 57 {
         index += 1
@@ -302,14 +331,18 @@ public enum SVGPathParser {
       }
       if sawDigit, index < bytes.count, bytes[index] == 101 || bytes[index] == 69 {
         var j = index + 1
-        if j < bytes.count, bytes[j] == 45 || bytes[j] == 43 { j += 1 }
+        if j < bytes.count, bytes[j] == 45 || bytes[j] == 43 {
+          j += 1
+        }
         if j < bytes.count, bytes[j] >= 48, bytes[j] <= 57 {
           index = j
-          while index < bytes.count, bytes[index] >= 48, bytes[index] <= 57 { index += 1 }
+          while index < bytes.count, bytes[index] >= 48, bytes[index] <= 57 {
+            index += 1
+          }
         }
       }
-      guard sawDigit, let text = String(bytes: bytes[start..<index], encoding: .utf8),
-        let value = Double(text)
+      guard sawDigit, let text = String(bytes: bytes[start ..< index], encoding: .utf8),
+            let value = Double(text)
       else {
         throw SVGPathParseError(message: "Expected a number", offset: start)
       }

@@ -7,7 +7,9 @@ struct BrandMark: View {
   var width: CGFloat = 32
   var color: Color = VZ.accent
 
-  private var aspect: CGFloat { BrandGlyph.viewBoxWidth / BrandGlyph.viewBoxHeight }
+  private var aspect: CGFloat {
+    BrandGlyph.viewBoxWidth / BrandGlyph.viewBoxHeight
+  }
 
   var body: some View {
     SVGShape(

@@ -6,6 +6,24 @@ All notable changes to VIZION for iOS are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed — CI reconcile + review round (2026-09-04)
+
+- **Build**: `IconView` and `ScreenHeader` initializers are `nonisolated` so a
+  view can be built inside a nonisolated builder closure (SE-0434).
+- **Composer**: the run button waits for attachments that are still
+  reserving/uploading/analyzing; a role change while an analysis is in flight
+  re-queues the file instead of accepting the stale result; storage bytes,
+  MIME and file extension always agree (PNG/JPEG/WebP/GIF kept verbatim, other
+  formats transcoded to JPEG).
+- **Library**: stale reloads no longer overwrite a newer filter's results;
+  resuming a draft switches to the composer.
+- **Deep links**: bare `vizion://library` and `vizion://settings` route to their
+  tabs, and links pending when the tab view appears are honoured.
+- **Lint**: SwiftLint config matched to the wire-shaped Codable rows and the
+  cursor tuples; SVG path data in tight disable regions; long user copy as
+  multi-line literals; `LibraryRepository`, `LibraryScreen` and the composer
+  view model split into extensions/files under the structural limits.
+
 ### Added — M0 Foundation · M1 Core · M2 Design system · M3 Services · M4 Screens (2026-09-03)
 
 - **Repository scaffold**: XcodeGen spec (`project.yml`), gitignored generated

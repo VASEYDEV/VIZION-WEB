@@ -9,7 +9,9 @@ public enum OutputFormat: String, CaseIterable, Codable, Sendable, Identifiable,
   case fewshot
   case xml
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public var label: String {
     switch self {

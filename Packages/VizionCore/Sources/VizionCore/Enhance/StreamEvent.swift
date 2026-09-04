@@ -35,7 +35,7 @@ public enum EnhanceStreamEvent: Sendable, Hashable {
 extension EnhanceStreamEvent: Decodable {
   private enum CodingKeys: String, CodingKey {
     case type, step, label, text, tokenIn, tokenOut, costUsd, snapshot, result, status, error,
-      notConfigured, capReached
+         notConfigured, capReached
   }
 
   public init(from decoder: any Decoder) throws {
@@ -43,28 +43,29 @@ extension EnhanceStreamEvent: Decodable {
     let type = try c.decode(String.self, forKey: .type)
     switch type {
     case "status":
-      let step = try c.decodeIfPresent(String.self, forKey: .step).flatMap(StreamStep.init(rawValue:))
+      let step = try c.decodeIfPresent(String.self, forKey: .step)
+        .flatMap(StreamStep.init(rawValue:))
       let label = try c.decodeIfPresent(String.self, forKey: .label) ?? step?.label ?? ""
       self = .status(step: step, label: label)
     case "thinking":
-      self = .thinking(text: try c.decodeIfPresent(String.self, forKey: .text) ?? "")
+      self = try .thinking(text: c.decodeIfPresent(String.self, forKey: .text) ?? "")
     case "delta":
-      self = .delta(text: try c.decodeIfPresent(String.self, forKey: .text) ?? "")
+      self = try .delta(text: c.decodeIfPresent(String.self, forKey: .text) ?? "")
     case "usage":
-      self = .usage(
-        tokenIn: try c.decodeIfPresent(Int.self, forKey: .tokenIn) ?? 0,
-        tokenOut: try c.decodeIfPresent(Int.self, forKey: .tokenOut) ?? 0,
-        costUsd: try c.decodeIfPresent(Double.self, forKey: .costUsd),
-        snapshot: try c.decodeIfPresent(Bool.self, forKey: .snapshot) ?? false
+      self = try .usage(
+        tokenIn: c.decodeIfPresent(Int.self, forKey: .tokenIn) ?? 0,
+        tokenOut: c.decodeIfPresent(Int.self, forKey: .tokenOut) ?? 0,
+        costUsd: c.decodeIfPresent(Double.self, forKey: .costUsd),
+        snapshot: c.decodeIfPresent(Bool.self, forKey: .snapshot) ?? false
       )
     case "done":
-      self = .done(try c.decode(EnhanceResult.self, forKey: .result))
+      self = try .done(c.decode(EnhanceResult.self, forKey: .result))
     case "error":
-      self = .error(
-        status: try c.decodeIfPresent(Int.self, forKey: .status) ?? 502,
-        message: try c.decodeIfPresent(String.self, forKey: .error) ?? "Enhancement failed.",
-        notConfigured: try c.decodeIfPresent(Bool.self, forKey: .notConfigured) ?? false,
-        capReached: try c.decodeIfPresent(Bool.self, forKey: .capReached) ?? false
+      self = try .error(
+        status: c.decodeIfPresent(Int.self, forKey: .status) ?? 502,
+        message: c.decodeIfPresent(String.self, forKey: .error) ?? "Enhancement failed.",
+        notConfigured: c.decodeIfPresent(Bool.self, forKey: .notConfigured) ?? false,
+        capReached: c.decodeIfPresent(Bool.self, forKey: .capReached) ?? false
       )
     default:
       throw DecodingError.dataCorruptedError(
@@ -118,7 +119,7 @@ public struct SSEParser: Sendable {
       guard line.hasPrefix("data:") else { continue }
       let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
       guard let data = payload.data(using: .utf8),
-        let event = try? decoder.decode(EnhanceStreamEvent.self, from: data)
+            let event = try? decoder.decode(EnhanceStreamEvent.self, from: data)
       else { continue }
       events.append(event)
     }
@@ -130,11 +131,12 @@ public struct SSEParser: Sendable {
     guard bytes.count >= 2 else { return nil }
     var i = 0
     while i < bytes.count - 1 {
-      if bytes[i] == 0x0A, bytes[i + 1] == 0x0A { return i..<(i + 2) }
+      if bytes[i] == 0x0A, bytes[i + 1] == 0x0A {
+        return i ..< (i + 2)
+      }
       if i < bytes.count - 3, bytes[i] == 0x0D, bytes[i + 1] == 0x0A, bytes[i + 2] == 0x0D,
-        bytes[i + 3] == 0x0A
-      {
-        return i..<(i + 4)
+         bytes[i + 3] == 0x0A {
+        return i ..< (i + 4)
       }
       i += 1
     }

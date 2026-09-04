@@ -78,8 +78,13 @@ enum VZ {
   enum Motion {
     static let quick: Double = 0.15
     static let slide: Double = 0.30
-    static var quickAnimation: Animation { .easeOut(duration: quick) }
-    static var slideAnimation: Animation { .timingCurve(0.16, 1, 0.3, 1, duration: slide) }
+    static var quickAnimation: Animation {
+      .easeOut(duration: quick)
+    }
+
+    static var slideAnimation: Animation {
+      .timingCurve(0.16, 1, 0.3, 1, duration: slide)
+    }
   }
 
   /// `--bottom-nav-h` (the tab bar itself adds the home-indicator inset).
@@ -102,7 +107,9 @@ extension Color {
 
   init(hexString: String) {
     var s = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
-    if s.hasPrefix("#") { s.removeFirst() }
+    if s.hasPrefix("#") {
+      s.removeFirst()
+    }
     let value = UInt32(s, radix: 16) ?? 0x7D858E
     self.init(hex: value)
   }
@@ -110,12 +117,18 @@ extension Color {
   /// A theme-swapped role token: the light value on the light canvas, the
   /// dark value on Void. Resolved per trait collection, so it follows the
   /// per-view `preferredColorScheme` and the system setting alike.
-  static func vz(light: UInt32, dark: UInt32, lightAlpha: Double = 1, darkAlpha: Double = 1) -> Color {
+  static func vz(
+    light: UInt32,
+    dark: UInt32,
+    lightAlpha: Double = 1,
+    darkAlpha: Double = 1
+  ) -> Color {
     Color(
       uiColor: UIColor { traits in
         let isDark = traits.userInterfaceStyle == .dark
         return UIColor(hex: isDark ? dark : light, alpha: isDark ? darkAlpha : lightAlpha)
-      })
+      }
+    )
   }
 }
 

@@ -39,12 +39,29 @@ public struct PromptCard: Sendable, Hashable, Identifiable {
     self.collectionID = collectionID
   }
 
-  public var target: TargetModel? { TargetModel.resolve(targetModel) }
-  public var modelLabel: String { TargetModel.label(forRaw: targetModel) }
-  public var developer: Developer? { TargetModel.developer(forRaw: targetModel) }
-  public var modeLabel: String? { mode.map(EnhanceMode.label(forRaw:)) }
-  public var updatedDate: Date? { PostgresDate.parse(updatedAt) }
-  public var createdDate: Date? { PostgresDate.parse(createdAt) }
+  public var target: TargetModel? {
+    TargetModel.resolve(targetModel)
+  }
+
+  public var modelLabel: String {
+    TargetModel.label(forRaw: targetModel)
+  }
+
+  public var developer: Developer? {
+    TargetModel.developer(forRaw: targetModel)
+  }
+
+  public var modeLabel: String? {
+    mode.map(EnhanceMode.label(forRaw:))
+  }
+
+  public var updatedDate: Date? {
+    PostgresDate.parse(updatedAt)
+  }
+
+  public var createdDate: Date? {
+    PostgresDate.parse(createdAt)
+  }
 }
 
 /// The raw `prompts` row shape the page query selects (Codable for PostgREST).
@@ -98,8 +115,13 @@ public struct ModelFacet: Sendable, Hashable, Identifiable {
     self.count = count
   }
 
-  public var label: String { TargetModel.label(forRaw: id) }
-  public var developer: Developer? { TargetModel.developer(forRaw: id) }
+  public var label: String {
+    TargetModel.label(forRaw: id)
+  }
+
+  public var developer: Developer? {
+    TargetModel.developer(forRaw: id)
+  }
 }
 
 /// Facets for the filter sheet: ONLY the models actually present, never the
@@ -129,7 +151,9 @@ public struct LibraryFacets: Sendable, Hashable {
     for row in rows {
       counts[row.targetModel, default: 0] += 1
       tagSet.formUnion(row.tags)
-      if let c = row.collectionID { collectionCounts[c, default: 0] += 1 }
+      if let c = row.collectionID {
+        collectionCounts[c, default: 0] += 1
+      }
     }
     let models = counts.map { ModelFacet(id: $0.key, count: $0.value) }
       .sorted { a, b in a.count != b.count ? a.count > b.count : a.id < b.id }
@@ -155,7 +179,11 @@ public struct LibraryFacets: Sendable, Hashable {
     var byDeveloper: [Developer: [ModelFacet]] = [:]
     var orphans: [ModelFacet] = []
     for m in models {
-      if let d = m.developer { byDeveloper[d, default: []].append(m) } else { orphans.append(m) }
+      if let d = m.developer {
+        byDeveloper[d, default: []].append(m)
+      } else {
+        orphans.append(m)
+      }
     }
     var groups: [FacetGroup] = []
     for developer in Developer.allCases {
@@ -163,7 +191,10 @@ public struct LibraryFacets: Sendable, Hashable {
         groups.append(FacetGroup(developer: developer, label: developer.label, models: bucket))
       }
     }
-    if !orphans.isEmpty { groups.append(FacetGroup(developer: nil, label: "Other", models: orphans)) }
+    if !orphans
+      .isEmpty {
+      groups.append(FacetGroup(developer: nil, label: "Other", models: orphans))
+    }
     return groups.count > 1 ? groups : nil
   }
 }
@@ -195,9 +226,17 @@ public struct DraftCard: Sendable, Hashable, Identifiable {
     self.updatedAt = updatedAt
   }
 
-  public var modelLabel: String { TargetModel.label(forRaw: targetModel) }
-  public var modeLabel: String { EnhanceMode.label(forRaw: mode) }
-  public var updatedDate: Date? { PostgresDate.parse(updatedAt) }
+  public var modelLabel: String {
+    TargetModel.label(forRaw: targetModel)
+  }
+
+  public var modeLabel: String {
+    EnhanceMode.label(forRaw: mode)
+  }
+
+  public var updatedDate: Date? {
+    PostgresDate.parse(updatedAt)
+  }
 }
 
 public struct DraftRow: Codable, Sendable, Hashable {
@@ -229,8 +268,13 @@ public struct VersionMeta: Codable, Sendable, Hashable, Identifiable {
   public var created_at: String
   public var parent_ver: String?
 
-  public var modeLabel: String { EnhanceMode.label(forRaw: mode) }
-  public var createdDate: Date? { PostgresDate.parse(created_at) }
+  public var modeLabel: String {
+    EnhanceMode.label(forRaw: mode)
+  }
+
+  public var createdDate: Date? {
+    PostgresDate.parse(created_at)
+  }
 }
 
 public struct VersionBody: Codable, Sendable, Hashable, Identifiable {
@@ -251,8 +295,13 @@ public struct PromptHead: Codable, Sendable, Hashable, Identifiable {
   public var archived_at: String?
   public var deleted_at: String?
 
-  public var target: TargetModel? { TargetModel.resolve(target_model) }
-  public var modelLabel: String { TargetModel.label(forRaw: target_model) }
+  public var target: TargetModel? {
+    TargetModel.resolve(target_model)
+  }
+
+  public var modelLabel: String {
+    TargetModel.label(forRaw: target_model)
+  }
 }
 
 /// Activity feed row (web: ActivityFeed).
@@ -289,7 +338,7 @@ public struct ActivityEvent: Sendable, Hashable, Identifiable {
   ) {
     self.id = id
     self.rawType = rawType
-    self.kind = Kind(rawValue: rawType)
+    kind = Kind(rawValue: rawType)
     self.title = title
     self.createdAt = createdAt
     self.promptID = promptID
@@ -299,12 +348,19 @@ public struct ActivityEvent: Sendable, Hashable, Identifiable {
   /// never a dangling "…of".
   public var verb: String {
     guard let kind else { return rawType }
-    if kind == .restored, title == nil { return "Restored a version" }
+    if kind == .restored, title == nil {
+      return "Restored a version"
+    }
     return kind.verb
   }
 
-  public var showsTitle: Bool { kind != .profileUpdated && title != nil }
-  public var createdDate: Date? { PostgresDate.parse(createdAt) }
+  public var showsTitle: Bool {
+    kind != .profileUpdated && title != nil
+  }
+
+  public var createdDate: Date? {
+    PostgresDate.parse(createdAt)
+  }
 }
 
 public struct Collection: Codable, Sendable, Hashable, Identifiable {

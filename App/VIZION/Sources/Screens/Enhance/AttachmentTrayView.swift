@@ -25,7 +25,8 @@ struct AttachmentRow: View {
       HStack(alignment: .top, spacing: 10) {
         thumbnail
         VStack(alignment: .leading, spacing: 4) {
-          Text(MediaContext.sanitizeName(attachment.name)).font(.vzBody(13, .medium)).foregroundStyle(VZ.text)
+          Text(MediaContext.sanitizeName(attachment.name)).font(.vzBody(13, .medium))
+            .foregroundStyle(VZ.text)
           HStack(spacing: 6) {
             roleMenu
             if attachment.role == .generate {
@@ -34,7 +35,13 @@ struct AttachmentRow: View {
           }
           Text(attachment.stepLabel)
             .font(.vzBody(11))
-            .foregroundStyle({ if case .error = attachment.status { VZ.flare } else { VZ.muted } }())
+            .foregroundStyle({
+              if case .error = attachment.status {
+                VZ.flare
+              } else {
+                VZ.muted
+              }
+            }())
           if attachment.ephemeral {
             Text("Analyzed without keeping").font(.vzBody(10)).foregroundStyle(VZ.muted)
           }
@@ -55,8 +62,10 @@ struct AttachmentRow: View {
           }
         }
       } else if attachment.status == .ready, attachment.role == .generate {
-        Button(attachment.inserted ? "Built" : "Build generation prompt") { model.insert(attachment.id) }
-          .buttonStyle(.secondaryInline).disabled(attachment.inserted)
+        Button(attachment.inserted ? "Built" : "Build generation prompt") {
+          model.insert(attachment.id)
+        }
+        .buttonStyle(.secondaryInline).disabled(attachment.inserted)
       }
     }
     .padding(12)

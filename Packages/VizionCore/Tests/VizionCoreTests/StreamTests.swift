@@ -1,11 +1,15 @@
-import XCTest
 @testable import VizionCore
+import XCTest
 
 final class StreamTests: XCTestCase {
   func testParserHandlesSplitFramesAndMultipleFramesPerChunk() {
     var parser = SSEParser()
-    let chunk1 = Array("data: {\"type\":\"status\",\"step\":\"queued\",\"label\":\"Queued\"}\n\ndata: {\"type\":\"del".utf8)
-    let chunk2 = Array("ta\",\"text\":\"Hel\"}\n\ndata: {\"type\":\"delta\",\"text\":\"lo\"}\n\n".utf8)
+    let chunk1 = Array(
+      "data: {\"type\":\"status\",\"step\":\"queued\",\"label\":\"Queued\"}\n\ndata: {\"type\":\"del"
+        .utf8
+    )
+    let chunk2 = Array("ta\",\"text\":\"Hel\"}\n\ndata: {\"type\":\"delta\",\"text\":\"lo\"}\n\n"
+      .utf8)
     let first = parser.feed(chunk1)
     XCTAssertEqual(first, [.status(step: .queued, label: "Queued")])
     let second = parser.feed(chunk2)
@@ -14,14 +18,16 @@ final class StreamTests: XCTestCase {
   }
 
   func testGarbledFramesAreSkippedAndCRLFAccepted() {
+    // swiftlint:disable:next line_length
     let body = "data: not json\r\n\r\ndata: {\"type\":\"usage\",\"tokenIn\":10,\"tokenOut\":2,\"snapshot\":true}\r\n\r\n"
     let events = SSEParser.parse(Data(body.utf8))
     XCTAssertEqual(events, [.usage(tokenIn: 10, tokenOut: 2, costUsd: nil, snapshot: true)])
   }
 
-  func testDoneAndErrorDecode() throws {
+  func testDoneAndErrorDecode() {
     // One JSON object per `data:` line — a raw newline inside the payload
     // would end the line, exactly as the web parser reads it.
+    // swiftlint:disable:next line_length
     let done = "data: {\"type\":\"done\",\"result\":{\"output\":\"o\",\"rationale\":\"r\",\"diff\":null,\"tokenIn\":1,\"tokenOut\":2,\"modelUsed\":\"claude-opus-5\",\"costUsd\":0.01,\"usage\":{\"todayCost\":0.5,\"capUsd\":2},\"resolvedTarget\":\"sonnet_5\",\"resolvedReason\":\"light-task\",\"questions\":[\"Q?\"]}}\n\n"
       + "data: {\"type\":\"error\",\"status\":503,\"error\":\"nope\",\"notConfigured\":true}\n\n"
     let events = SSEParser.parse(Data(done.utf8))
@@ -32,7 +38,10 @@ final class StreamTests: XCTestCase {
     XCTAssertEqual(result.resolvedReasonLabel, "quick task")
     XCTAssertEqual(result.questions, ["Q?"])
     XCTAssertEqual(result.capFraction, 0.25, accuracy: 0.0001)
-    XCTAssertEqual(events[1], .error(status: 503, message: "nope", notConfigured: true, capReached: false))
+    XCTAssertEqual(
+      events[1],
+      .error(status: 503, message: "nope", notConfigured: true, capReached: false)
+    )
   }
 
   func testUnknownResolvedReasonRendersNothing() throws {
@@ -42,7 +51,9 @@ final class StreamTests: XCTestCase {
         """
         {"output":"o","rationale":"r","diff":[{"op":"equal","text":"o"}],"tokenIn":1,"tokenOut":1,
          "modelUsed":"m","costUsd":0,"usage":{"todayCost":0,"capUsd":2},"resolvedReason":"future-reason"}
-        """.utf8))
+        """.utf8
+      )
+    )
     XCTAssertNil(result.resolvedReasonLabel)
     XCTAssertEqual(result.diff?.count, 1)
   }
@@ -62,7 +73,7 @@ final class StreamTests: XCTestCase {
     XCTAssertTrue(state.usageMeasured)
     XCTAssertEqual(state.tokenOut, 90)
     XCTAssertEqual(state.tokenIn, 1300)
-    state.apply(.delta(text: String(repeating: "y", count: 4_000)))
+    state.apply(.delta(text: String(repeating: "y", count: 4000)))
     XCTAssertEqual(state.tokenOut, 90, "estimator stands down after a measurement")
     // A late snapshot may only raise.
     state.apply(.usage(tokenIn: 1000, tokenOut: 50, costUsd: 0.01, snapshot: true))
@@ -78,7 +89,8 @@ final class StreamTests: XCTestCase {
       input: "hi", mode: .polish, target: .opus5, auto: false, autoPreference: .quality,
       format: .json, length: .long, thinkingLevel: .high, mediaContext: []
     )
-    let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(req)) as! [String: Any]
+    let json = try XCTUnwrap(JSONSerialization
+      .jsonObject(with: JSONEncoder().encode(req)) as? [String: Any])
     XCTAssertEqual(json["input"] as? String, "hi")
     XCTAssertEqual(json["mode"] as? String, "polish")
     XCTAssertEqual(json["target"] as? String, "opus_5")
@@ -90,18 +102,47 @@ final class StreamTests: XCTestCase {
     XCTAssertNil(json["mediaContext"])
     XCTAssertNil(json["refine"])
 
-    let auto = EnhanceRequest(input: "hi", mode: .reformat, target: .opus5, auto: true, autoPreference: .budget, format: .xml)
-    let autoJSON = try JSONSerialization.jsonObject(with: JSONEncoder().encode(auto)) as! [String: Any]
+    let auto = EnhanceRequest(
+      input: "hi",
+      mode: .reformat,
+      target: .opus5,
+      auto: true,
+      autoPreference: .budget,
+      format: .xml
+    )
+    let autoJSON = try XCTUnwrap(JSONSerialization
+      .jsonObject(with: JSONEncoder().encode(auto)) as? [String: Any])
     XCTAssertEqual(autoJSON["auto"] as? Bool, true)
     XCTAssertEqual(autoJSON["autoPreference"] as? String, "budget")
     XCTAssertEqual(autoJSON["format"] as? String, "xml")
   }
 
   func testRequestValidation() {
-    XCTAssertEqual(EnhanceRequest(input: "   ", mode: .clarify, target: .opus5).validate(), "Provide a prompt to enhance.")
-    XCTAssertNotNil(EnhanceRequest(input: String(repeating: "a", count: 20_001), mode: .clarify, target: .opus5).validate())
-    XCTAssertNotNil(EnhanceRequest(input: "x", mode: .clarify, target: .deepseekV4, thinkingLevel: .high).validate())
-    XCTAssertNil(EnhanceRequest(input: "x", mode: .clarify, target: .deepseekV4, auto: true, thinkingLevel: .high).validate(), "under Auto an out-of-ladder level is advisory")
+    XCTAssertEqual(
+      EnhanceRequest(input: "   ", mode: .clarify, target: .opus5).validate(),
+      "Provide a prompt to enhance."
+    )
+    XCTAssertNotNil(EnhanceRequest(
+      input: String(repeating: "a", count: 20001),
+      mode: .clarify,
+      target: .opus5
+    ).validate())
+    XCTAssertNotNil(EnhanceRequest(
+      input: "x",
+      mode: .clarify,
+      target: .deepseekV4,
+      thinkingLevel: .high
+    ).validate())
+    XCTAssertNil(
+      EnhanceRequest(
+        input: "x",
+        mode: .clarify,
+        target: .deepseekV4,
+        auto: true,
+        thinkingLevel: .high
+      ).validate(),
+      "under Auto an out-of-ladder level is advisory"
+    )
   }
 
   func testAnswersBlock() {
@@ -109,12 +150,20 @@ final class StreamTests: XCTestCase {
     XCTAssertEqual(block, "Q: Who?\nA: Me\n\nQ: Why?\nA: Because")
   }
 
-  func testExports() {
-    let d = ExportData(input: "in", output: "out \"q\"", rationale: "why", mode: .target, target: .kimiK3, modelUsed: "kimi-k3")
+  func testExports() throws {
+    let d = ExportData(
+      input: "in",
+      output: "out \"q\"",
+      rationale: "why",
+      mode: .target,
+      target: .kimiK3,
+      modelUsed: "kimi-k3"
+    )
     XCTAssertTrue(ExportFormat.markdown.render(d).hasPrefix("# VIZION — Adapt → Kimi K3\n"))
     XCTAssertEqual(ExportFormat.text.render(d), "out \"q\"\n")
     let json = ExportFormat.json.render(d)
-    let parsed = try! JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: String]
+    let parsed = try XCTUnwrap(JSONSerialization
+      .jsonObject(with: Data(json.utf8)) as? [String: String])
     XCTAssertEqual(parsed["mode"], "target")
     XCTAssertEqual(parsed["output"], "out \"q\"")
     XCTAssertTrue(json.hasPrefix("{\n  \"mode\": \"target\",\n  \"target\": \"kimi_k3\""))

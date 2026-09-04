@@ -16,7 +16,9 @@ public enum Developer: String, CaseIterable, Codable, Sendable, Identifiable, Ha
   case xai
   case zai
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public var label: String {
     switch self {

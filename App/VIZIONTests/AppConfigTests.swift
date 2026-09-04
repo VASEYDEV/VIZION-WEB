@@ -1,5 +1,5 @@
-import XCTest
 @testable import VIZION
+import XCTest
 
 final class AppConfigTests: XCTestCase {
   func testTemplatePlaceholdersFailClosed() {

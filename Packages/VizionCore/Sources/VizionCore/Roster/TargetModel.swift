@@ -22,7 +22,9 @@ public enum TargetModel: String, CaseIterable, Codable, Sendable, Identifiable, 
   case grok45 = "grok_4_5"
   case glm52 = "glm_5_2"
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public var label: String {
     switch self {
@@ -73,7 +75,9 @@ public enum TargetModel: String, CaseIterable, Codable, Sendable, Identifiable, 
     }
   }
 
-  public var hasThinkingDial: Bool { !thinkingLadder.isEmpty }
+  public var hasThinkingDial: Bool {
+    !thinkingLadder.isEmpty
+  }
 
   /// The device-local fallback the web UI store starts on.
   public static let `default`: TargetModel = .opus5

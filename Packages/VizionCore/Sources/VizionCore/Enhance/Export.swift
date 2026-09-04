@@ -27,7 +27,9 @@ public enum ExportFormat: String, CaseIterable, Sendable, Identifiable {
   case json
   case text = "txt"
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public var label: String {
     switch self {
@@ -37,7 +39,9 @@ public enum ExportFormat: String, CaseIterable, Sendable, Identifiable {
     }
   }
 
-  public var fileExtension: String { rawValue }
+  public var fileExtension: String {
+    rawValue
+  }
 
   public var mimeType: String {
     switch self {

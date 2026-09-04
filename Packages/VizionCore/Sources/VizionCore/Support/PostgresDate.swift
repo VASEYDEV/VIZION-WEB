@@ -13,7 +13,7 @@ public enum PostgresDate {
     func num(_ from: Int, _ len: Int) -> Int? {
       guard from + len <= scalars.count else { return nil }
       var value = 0
-      for i in from..<(from + len) {
+      for i in from ..< (from + len) {
         let c = scalars[i]
         guard c >= 48, c <= 57 else { return nil }
         value = value * 10 + Int(c - 48)
@@ -22,11 +22,11 @@ public enum PostgresDate {
     }
 
     guard let year = num(0, 4), scalars[4] == 45, let month = num(5, 2), scalars[7] == 45,
-      let day = num(8, 2), scalars[10] == 84 || scalars[10] == 32, let hour = num(11, 2),
-      scalars[13] == 58, let minute = num(14, 2), scalars[16] == 58, let second = num(17, 2)
+          let day = num(8, 2), scalars[10] == 84 || scalars[10] == 32, let hour = num(11, 2),
+          scalars[13] == 58, let minute = num(14, 2), scalars[16] == 58, let second = num(17, 2)
     else { return nil }
-    guard (1...12).contains(month), (1...31).contains(day), (0...23).contains(hour),
-      (0...59).contains(minute), (0...60).contains(second)
+    guard (1 ... 12).contains(month), (1 ... 31).contains(day), (0 ... 23).contains(hour),
+          (0 ... 59).contains(minute), (0 ... 60).contains(second)
     else { return nil }
 
     var index = 19
@@ -59,8 +59,12 @@ public enum PostgresDate {
         guard let oh = num(index + 1, 2) else { return nil }
         var om = 0
         var next = index + 3
-        if next < scalars.count, scalars[next] == 58 { next += 1 }
-        if let m = num(next, 2) { om = m }
+        if next < scalars.count, scalars[next] == 58 {
+          next += 1
+        }
+        if let m = num(next, 2) {
+          om = m
+        }
         offsetSeconds = sign * (oh * 3600 + om * 60)
       }
     }

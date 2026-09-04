@@ -6,7 +6,7 @@ import Foundation
 /// and dims "removed" on the input side.
 public enum WordDiff {
   /// Per-side token budget for interactive diffs (the LCS table is O(n·m)).
-  public static let tokenBudget = 2_000
+  public static let tokenBudget = 2000
 
   /// Split into tokens keeping whitespace runs as their own tokens, so the
   /// diff re-joins losslessly (JS: `/\s+|[^\s]+/g`).
@@ -23,7 +23,9 @@ public enum WordDiff {
       current.append(ch)
       currentIsSpace = isSpace
     }
-    if !current.isEmpty { tokens.append(current) }
+    if !current.isEmpty {
+      tokens.append(current)
+    }
     return tokens
   }
 
@@ -81,7 +83,9 @@ public enum WordDiff {
   public static func boundedDiffWords(
     _ before: String, _ after: String, budget: Int = tokenBudget
   ) -> [DiffSegment]? {
-    if tokenize(before).count > budget || tokenize(after).count > budget { return nil }
+    if tokenize(before).count > budget || tokenize(after).count > budget {
+      return nil
+    }
     return diffWords(before, after)
   }
 
@@ -103,7 +107,9 @@ public enum WordDiff {
     public let index: Int
     public var removed: String
     public var added: String
-    public var id: Int { index }
+    public var id: Int {
+      index
+    }
   }
 
   /// Hunk id per segment (nil = equal text outside any hunk). The single
@@ -124,7 +130,9 @@ public enum WordDiff {
         continue
       }
       if let active = activeID {
-        for w in pendingWhitespace { ids[w] = active }
+        for w in pendingWhitespace {
+          ids[w] = active
+        }
         pendingWhitespace = []
         ids[i] = active
       } else {
@@ -144,8 +152,12 @@ public enum WordDiff {
     for (i, seg) in segments.enumerated() {
       guard let id = ids[i] else { continue }
       var hunk = hunks[id] ?? Hunk(index: id, removed: "", added: "")
-      if seg.op != .added { hunk.removed += seg.text }
-      if seg.op != .removed { hunk.added += seg.text }
+      if seg.op != .added {
+        hunk.removed += seg.text
+      }
+      if seg.op != .removed {
+        hunk.added += seg.text
+      }
       hunks[id] = hunk
     }
     return hunks.keys.sorted().compactMap { hunks[$0] }
@@ -162,8 +174,12 @@ public enum WordDiff {
         continue
       }
       let isRejected = ids[i].map { rejected.contains($0) } ?? false
-      if seg.op == .added, !isRejected { out += seg.text }
-      if seg.op == .removed, isRejected { out += seg.text }
+      if seg.op == .added, !isRejected {
+        out += seg.text
+      }
+      if seg.op == .removed, isRejected {
+        out += seg.text
+      }
     }
     return out
   }
@@ -176,16 +192,24 @@ public enum WordDiff {
     var runHasInk = false
     for seg in segments {
       if seg.op == .equal {
-        if seg.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { continue }
-        if inRun, runHasInk { sections += 1 }
+        if seg.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          continue
+        }
+        if inRun, runHasInk {
+          sections += 1
+        }
         inRun = false
         runHasInk = false
       } else {
         inRun = true
-        if !seg.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { runHasInk = true }
+        if !seg.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          runHasInk = true
+        }
       }
     }
-    if inRun, runHasInk { sections += 1 }
+    if inRun, runHasInk {
+      sections += 1
+    }
     return sections
   }
 

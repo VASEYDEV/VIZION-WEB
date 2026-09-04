@@ -9,7 +9,9 @@ public enum LengthSetting: String, CaseIterable, Codable, Sendable, Identifiable
   case medium
   case long
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   /// Label for a mode, or nil when the mode has no dial.
   public func label(for mode: EnhanceMode) -> String? {
@@ -33,7 +35,9 @@ public enum LengthSetting: String, CaseIterable, Codable, Sendable, Identifiable
 
 public extension EnhanceMode {
   /// Whether the length dial applies to this mode.
-  var hasLengthControl: Bool { self == .condense || self == .expand }
+  var hasLengthControl: Bool {
+    self == .condense || self == .expand
+  }
 
   /// Ordered least → most aggressive *for this mode*, or nil when it has no dial.
   var lengthOptions: [(id: LengthSetting, label: String)]? {

@@ -25,7 +25,9 @@ struct AuthGateView: View {
     .task {
       // Owner switch: when access is closed the magic-link path must not mint
       // NEW accounts. Readable pre-auth (the web reads it the same way).
-      if let settings = try? await env.profiles?.appSettings() { openAccess = settings.open_access }
+      if let settings = try? await env.profiles?.appSettings() {
+        openAccess = settings.open_access
+      }
     }
   }
 }
@@ -64,7 +66,9 @@ struct SignInForm: View {
 
   private enum Field { case email, password }
 
-  private var busy: Bool { status == .sending }
+  private var busy: Bool {
+    status == .sending
+  }
 
   var body: some View {
     VStack(spacing: 12) {
@@ -116,7 +120,13 @@ struct SignInForm: View {
         .vzInputFont()
         .vzField()
         .focused($focus, equals: .email)
-        .onSubmit { if withPassword { focus = .password } else { Task { await submitEmail() } } }
+        .onSubmit {
+          if withPassword {
+            focus = .password
+          } else {
+            Task { await submitEmail() }
+          }
+        }
         .accessibilityLabel("Email address")
 
       if withPassword {
@@ -133,7 +143,8 @@ struct SignInForm: View {
       Button {
         Task { await submitEmail() }
       } label: {
-        Text(busy ? (withPassword ? "Signing in…" : "Sending…") : (withPassword ? "Sign in" : "Email me a magic link"))
+        Text(busy ? (withPassword ? "Signing in…" : "Sending…") :
+          (withPassword ? "Sign in" : "Email me a magic link"))
       }
       .buttonStyle(.laser)
       .disabled(busy || email.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -195,7 +206,10 @@ struct SignInForm: View {
       }
     } catch {
       let message = error.localizedDescription
-      let closed = message.range(of: "sign-?ups?|signup", options: [.regularExpression, .caseInsensitive]) != nil
+      let closed = message.range(
+        of: "sign-?ups?|signup",
+        options: [.regularExpression, .caseInsensitive]
+      ) != nil
       status = .error(closed ? "New registrations are currently closed." : message)
     }
   }

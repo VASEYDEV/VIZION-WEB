@@ -27,12 +27,20 @@ final class VizionAPI: Sendable {
     }
   }
 
-  private func request(_ method: String, path: String, body: Data?, accept: String) async throws -> URLRequest {
+  private func request(
+    _ method: String,
+    path: String,
+    body: Data?,
+    accept: String
+  ) async throws -> URLRequest {
     var request = URLRequest(url: baseURL.appending(path: path))
     request.httpMethod = method
-    request.setValue("Bearer \(try await tokenProvider())", forHTTPHeaderField: "Authorization")
+    try await request.setValue("Bearer \(tokenProvider())", forHTTPHeaderField: "Authorization")
     request.setValue(accept, forHTTPHeaderField: "Accept")
-    request.setValue("VIZION-iOS/\(AppVersion.marketing) (\(AppVersion.build))", forHTTPHeaderField: "User-Agent")
+    request.setValue(
+      "VIZION-iOS/\(AppVersion.marketing) (\(AppVersion.build))",
+      forHTTPHeaderField: "User-Agent"
+    )
     if let body {
       request.setValue("application/json", forHTTPHeaderField: "Content-Type")
       request.httpBody = body
@@ -42,10 +50,15 @@ final class VizionAPI: Sendable {
 
   /// Decode a non-200 JSON gate failure into the shared failure type.
   private static func failure(status: Int, data: Data, fallback: String) -> EnhanceFailure {
-    let body = (try? JSONDecoder().decode(APIErrorBody.self, from: data)) ?? APIErrorBody(error: nil)
+    let body = (try? JSONDecoder().decode(APIErrorBody.self, from: data)) ??
+      APIErrorBody(error: nil)
     let message = body.error ?? (status == 401 ? "Your session expired — sign in again." : fallback)
-    return APIErrorBody(error: message, notConfigured: body.notConfigured, capReached: body.capReached)
-      .failure(status: status, fallback: fallback)
+    return APIErrorBody(
+      error: message,
+      notConfigured: body.notConfigured,
+      capReached: body.capReached
+    )
+    .failure(status: status, fallback: fallback)
   }
 
   // MARK: /api/enhance
@@ -58,14 +71,21 @@ final class VizionAPI: Sendable {
       let task = Task {
         do {
           let payload = try JSONEncoder().encode(body)
-          let request = try await self.request("POST", path: "/api/enhance", body: payload, accept: "text/event-stream")
+          let request = try await self.request(
+            "POST",
+            path: "/api/enhance",
+            body: payload,
+            accept: "text/event-stream"
+          )
           let (bytes, response) = try await self.session.bytes(for: request)
           let http = response as? HTTPURLResponse
           let status = http?.statusCode ?? 0
           let contentType = http?.value(forHTTPHeaderField: "Content-Type") ?? ""
           guard status == 200, contentType.contains("event-stream") else {
             var data = Data()
-            for try await byte in bytes { data.append(byte) }
+            for try await byte in bytes {
+              data.append(byte)
+            }
             throw Self.failure(status: status, data: data, fallback: "Enhancement failed.")
           }
           var parser = SSEParser()
@@ -75,13 +95,19 @@ final class VizionAPI: Sendable {
             chunk.append(byte)
             // Flush on a frame-boundary candidate or a full buffer.
             if byte == 0x0A || chunk.count >= 1024 {
-              for event in parser.feed(chunk) { continuation.yield(event) }
+              for event in parser.feed(chunk) {
+                continuation.yield(event)
+              }
               chunk.removeAll(keepingCapacity: true)
             }
             try Task.checkCancellation()
           }
-          for event in parser.feed(chunk) { continuation.yield(event) }
-          for event in parser.finish() { continuation.yield(event) }
+          for event in parser.feed(chunk) {
+            continuation.yield(event)
+          }
+          for event in parser.finish() {
+            continuation.yield(event)
+          }
           continuation.finish()
         } catch is CancellationError {
           continuation.finish(throwing: EnhanceFailure.cancelled)
@@ -98,10 +124,19 @@ final class VizionAPI: Sendable {
   // MARK: /api/media
 
   func analyze(_ body: MediaAnalysisRequest) async throws -> MediaAnalysisResponse {
-    let request = try await request("POST", path: "/api/media", body: try JSONEncoder().encode(body), accept: "application/json")
+    let request = try await request(
+      "POST",
+      path: "/api/media",
+      body: JSONEncoder().encode(body),
+      accept: "application/json"
+    )
     let (data, response) = try await session.data(for: request)
     let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-    guard status == 200 else { throw Self.failure(status: status, data: data, fallback: "Extraction failed.") }
+    guard status == 200 else { throw Self.failure(
+      status: status,
+      data: data,
+      fallback: "Extraction failed."
+    ) }
     return try JSONDecoder().decode(MediaAnalysisResponse.self, from: data)
   }
 
@@ -109,7 +144,12 @@ final class VizionAPI: Sendable {
 
   /// Permanently delete the signed-in account (App Store 5.1.1(v)). 204 on success.
   func deleteAccount() async throws {
-    let request = try await request("DELETE", path: "/api/account", body: nil, accept: "application/json")
+    let request = try await request(
+      "DELETE",
+      path: "/api/account",
+      body: nil,
+      accept: "application/json"
+    )
     let (data, response) = try await session.data(for: request)
     let status = (response as? HTTPURLResponse)?.statusCode ?? 0
     guard status == 204 || status == 200 else {

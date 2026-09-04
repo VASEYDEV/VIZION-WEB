@@ -16,7 +16,11 @@ struct EnhanceScreen: View {
         ProgressView()
       }
     }
-    .onAppear { if model == nil { model = EnhanceViewModel(env: env) } }
+    .onAppear {
+      if model == nil {
+        model = EnhanceViewModel(env: env)
+      }
+    }
   }
 }
 
@@ -29,7 +33,13 @@ struct EnhanceComposer: View {
   @State private var showSave = false
   @FocusState private var editorFocused: Bool
 
-  private var ui: UIStore { env.ui }
+  private var ui: UIStore {
+    env.ui
+  }
+
+  private var draftIsEmpty: Bool {
+    ui.editorDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
 
   var body: some View {
     @Bindable var ui = env.ui
@@ -43,11 +53,17 @@ struct EnhanceComposer: View {
           }
         }
         ScreenColumn(spacing: 24) {
-          if let offer = model.draftOffer { draftOfferBanner(offer) }
-          if let view = model.view, view.result.capFraction >= 0.8 { capBanner(view.result) }
+          if let offer = model.draftOffer {
+            draftOfferBanner(offer)
+          }
+          if let view = model.view, view.result.capFraction >= 0.8 {
+            capBanner(view.result)
+          }
           ModeRigView(activeMode: $ui.activeMode)
           composer
-          if !model.attachments.isEmpty { AttachmentTrayView(model: model) }
+          if !model.attachments.isEmpty {
+            AttachmentTrayView(model: model)
+          }
           rails
           runControls
           if let view = model.view, !model.isRunning {
@@ -66,7 +82,10 @@ struct EnhanceComposer: View {
         autoDescription: "Picks the model per run from what's configured — quality, balanced, or budget."
       )
     }
-    .sheet(isPresented: $showThinking) { ThinkingDialSheet(target: ui.targetModel, level: $ui.thinkingLevel) }
+    .sheet(isPresented: $showThinking) { ThinkingDialSheet(
+      target: ui.targetModel,
+      level: $ui.thinkingLevel
+    ) }
     .sheet(isPresented: $showTemplates) {
       TemplateSheet { template in
         model.apply(template: template)
@@ -102,13 +121,19 @@ struct EnhanceComposer: View {
         Text("\(ui.editorDraft.utf16.count) chars · ~\(model.tokenEstimate) tok")
           .font(.vzBody(11)).monospacedDigit().foregroundStyle(VZ.muted)
         if ui.editorDraft.utf16.count > EnhanceRequest.maxInputChars {
-          Text("over the \(EnhanceRequest.maxInputChars) limit").font(.vzBody(11)).foregroundStyle(VZ.flare)
+          Text("over the \(EnhanceRequest.maxInputChars) limit").font(.vzBody(11))
+            .foregroundStyle(VZ.flare)
         }
         Spacer()
         if ui.editorDraft.isEmpty {
-          Button { model.paste() } label: { HStack(spacing: 4) { IconView(.paste, size: 14); Text("Paste") } }
-            .buttonStyle(.quiet)
-          Button { showTemplates = true } label: { HStack(spacing: 4) { IconView(.sparkle, size: 14); Text("Templates") } }
+          Button { model.paste() } label: {
+            HStack(spacing: 4) { IconView(.paste, size: 14); Text("Paste") }
+          }
+          .buttonStyle(.quiet)
+          Button { showTemplates = true } label: { HStack(spacing: 4) { IconView(
+            .sparkle,
+            size: 14
+          ); Text("Templates") } }
             .buttonStyle(.quiet)
         }
         PhotosPicker(selection: $model.pendingPick, maxSelectionCount: 4, matching: .images) {
@@ -119,7 +144,9 @@ struct EnhanceComposer: View {
           guard !items.isEmpty, !model.showPrivacyNotice else { return }
           Task {
             await model.handlePicked(items)
-            if !model.showPrivacyNotice { model.pendingPick = [] }
+            if !model.showPrivacyNotice {
+              model.pendingPick = []
+            }
           }
         }
       }
@@ -176,16 +203,21 @@ struct EnhanceComposer: View {
         railRow("Depth") {
           VZSegmented(
             options: options.map { (id: $0.id, label: $0.label) },
-            selection: Binding(get: { ui.lengthForActiveMode }, set: { ui.lengthForActiveMode = $0 }),
+            selection: Binding(
+              get: { ui.lengthForActiveMode },
+              set: { ui.lengthForActiveMode = $0 }
+            ),
             fill: true, clearsOnReselect: true, accessibilityLabel: "Length"
           )
         }
       }
 
       if ui.activeMode.isShapePreserving, !ui.autoTarget {
-        Text("\(ui.activeMode.label) keeps your prompt's shape — the model only affects routing and cost.")
-          .font(.vzBody(11)).foregroundStyle(VZ.muted)
-          .frame(maxWidth: .infinity, alignment: .leading)
+        Text(
+          "\(ui.activeMode.label) keeps your prompt's shape — the model only affects routing and cost."
+        )
+        .font(.vzBody(11)).foregroundStyle(VZ.muted)
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
   }
@@ -214,7 +246,11 @@ struct EnhanceComposer: View {
           }
         }
         .buttonStyle(.laser)
-        .disabled(ui.editorDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .disabled(draftIsEmpty || model.attachmentsPending)
+        if model.attachmentsPending {
+          Text("Waiting for attachments to finish — the run would otherwise miss them.")
+            .font(.vzBody(12)).foregroundStyle(VZ.muted)
+        }
       }
       if let error = model.error, !error.isCancelled {
         VStack(alignment: .leading, spacing: 6) {
@@ -233,7 +269,8 @@ struct EnhanceComposer: View {
 
   private func draftOfferBanner(_ text: String) -> some View {
     VStack(alignment: .leading, spacing: 10) {
-      Text("A prompt arrived while you had work in progress").font(.vzBody(14, .medium)).foregroundStyle(VZ.text)
+      Text("A prompt arrived while you had work in progress").font(.vzBody(14, .medium))
+        .foregroundStyle(VZ.text)
       Text(text).font(.vzBody(13)).foregroundStyle(VZ.muted).lineLimit(4)
       HStack {
         Button("Replace draft") { model.acceptDraftOffer() }.buttonStyle(.laserInline)
@@ -248,10 +285,12 @@ struct EnhanceComposer: View {
   private func capBanner(_ result: EnhanceResult) -> some View {
     HStack(spacing: 10) {
       Circle().fill(VZ.amber).frame(width: 8, height: 8)
+      let cap = String(format: "%.2f", result.usage.capUsd)
+      let today = String(format: "%.2f", result.usage.todayCost)
       Text(
         result.capFraction >= 1
-          ? "You've reached today's usage cap ($\(result.usage.capUsd, specifier: "%.2f")). It resets at midnight UTC."
-          : "Today's usage: $\(result.usage.todayCost, specifier: "%.2f") of $\(result.usage.capUsd, specifier: "%.2f")."
+          ? "You've reached today's usage cap ($\(cap)). It resets at midnight UTC."
+          : "Today's usage: $\(today) of $\(cap)."
       )
       .font(.vzBody(12)).foregroundStyle(VZ.amberInk)
     }
@@ -327,7 +366,7 @@ struct DepthMeter: View {
   var body: some View {
     let filled = level.flatMap { ladder.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
     HStack(alignment: .bottom, spacing: 2) {
-      ForEach(0..<max(ladder.count, 1), id: \.self) { i in
+      ForEach(0 ..< max(ladder.count, 1), id: \.self) { i in
         RoundedRectangle(cornerRadius: 1)
           .fill(i < filled ? (level?.tone == .ultra ? VZ.ultra : VZ.muted) : VZ.muted.opacity(0.25))
           .frame(width: 3, height: 5 + CGFloat(i) * 2)
@@ -368,8 +407,12 @@ struct StreamProgressView: View {
 
   private var ticker: String {
     var parts = ["\(stream.tokenIn)→\(stream.tokenOut) tok"]
-    if stream.costUsd > 0 { parts.append(String(format: "$%.4f", stream.costUsd)) }
-    if !stream.usageMeasured { parts[0] = "≈" + parts[0] }
+    if stream.costUsd > 0 {
+      parts.append(String(format: "$%.4f", stream.costUsd))
+    }
+    if !stream.usageMeasured {
+      parts[0] = "≈" + parts[0]
+    }
     return parts.joined(separator: " · ")
   }
 }
@@ -410,8 +453,14 @@ struct MediaPrivacySheet: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       Text("Before you attach").font(.vzDisplay(26)).foregroundStyle(VZ.text)
-      Text("Attached images are sent to the selected model to read what they contain. Kept attachments stay in your private storage (50 MB) until you remove them in Settings → Data & privacy. Choose \"Analyze without keeping\" and nothing is stored.")
-        .font(.vzBody(14)).foregroundStyle(VZ.muted)
+      Text(
+        """
+        Attached images are sent to the selected model to read what they contain. \
+        Kept attachments stay in your private storage (50 MB) until you remove them in \
+        Settings → Data & privacy. Choose "Analyze without keeping" and nothing is stored.
+        """
+      )
+      .font(.vzBody(14)).foregroundStyle(VZ.muted)
       Toggle("Keep attachments by default", isOn: $keep).font(.vzBody(15)).tint(VZ.accent)
       Button("Got it") { Task { await model.acknowledgePrivacyNotice(keepByDefault: keep) } }
         .buttonStyle(.laser)

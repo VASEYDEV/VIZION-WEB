@@ -15,7 +15,9 @@ public enum MediaKind: String, CaseIterable, Codable, Sendable, Hashable {
     }
   }
 
-  public static var allAllowedMIME: [String] { allCases.flatMap(\.allowedMIME) }
+  public static var allAllowedMIME: [String] {
+    allCases.flatMap(\.allowedMIME)
+  }
 
   public static func kind(forMIME mime: String) -> MediaKind? {
     let lower = mime.lowercased()
@@ -88,7 +90,9 @@ public enum AttachmentRole: String, CaseIterable, Codable, Sendable, Identifiabl
   case style
   case generate
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public static let `default`: AttachmentRole = .reference
 
@@ -151,7 +155,9 @@ public enum GenTarget: String, CaseIterable, Codable, Sendable, Identifiable, Ha
   case kling
   case audio
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public var label: String {
     switch self {

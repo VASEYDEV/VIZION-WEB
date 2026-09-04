@@ -91,7 +91,9 @@ public struct EnhanceResult: Codable, Sendable, Hashable {
     self.resolvedReason = resolvedReason
   }
 
-  public var resolvedReasonLabel: String? { AutoRouteReason.label(forRaw: resolvedReason) }
+  public var resolvedReasonLabel: String? {
+    AutoRouteReason.label(forRaw: resolvedReason)
+  }
 
   /// Fraction of today's cap consumed after this run, 0…∞.
   public var capFraction: Double {
@@ -115,8 +117,13 @@ public struct EnhanceFailure: Error, Sendable, Hashable, LocalizedError {
     self.capReached = capReached
   }
 
-  public var isCancelled: Bool { status == 0 }
-  public var errorDescription: String? { message }
+  public var isCancelled: Bool {
+    status == 0
+  }
+
+  public var errorDescription: String? {
+    message
+  }
 
   public static let cancelled = EnhanceFailure(message: "Cancelled.", status: 0)
 

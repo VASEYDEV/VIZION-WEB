@@ -13,14 +13,21 @@ final class ToastCenter {
     var actionLabel: String?
     var action: (@MainActor () -> Void)?
 
-    static func == (lhs: Toast, rhs: Toast) -> Bool { lhs.id == rhs.id }
+    static func == (lhs: Toast, rhs: Toast) -> Bool {
+      lhs.id == rhs.id
+    }
   }
 
   private(set) var current: Toast?
   private var dismissTask: Task<Void, Never>?
 
   /// Six seconds — the Undo window; an action keeps the toast a little longer.
-  func show(_ text: String, tone: Toast.Tone = .neutral, actionLabel: String? = nil, action: (@MainActor () -> Void)? = nil) {
+  func show(
+    _ text: String,
+    tone: Toast.Tone = .neutral,
+    actionLabel: String? = nil,
+    action: (@MainActor () -> Void)? = nil
+  ) {
     dismissTask?.cancel()
     current = Toast(text: text, tone: tone, actionLabel: actionLabel, action: action)
     let id = current?.id
@@ -31,7 +38,9 @@ final class ToastCenter {
     }
   }
 
-  func error(_ text: String) { show(text, tone: .error) }
+  func error(_ text: String) {
+    show(text, tone: .error)
+  }
 
   func dismiss() {
     dismissTask?.cancel()

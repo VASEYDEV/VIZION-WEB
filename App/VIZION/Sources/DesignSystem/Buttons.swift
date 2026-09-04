@@ -12,7 +12,10 @@ struct LaserButtonStyle: ButtonStyle {
       .padding(.horizontal, 20)
       .frame(minHeight: 48)
       .frame(maxWidth: fullWidth ? .infinity : nil)
-      .background(VZ.laser, in: RoundedRectangle(cornerRadius: VZ.Radius.control, style: .continuous))
+      .background(
+        VZ.laser,
+        in: RoundedRectangle(cornerRadius: VZ.Radius.control, style: .continuous)
+      )
       .shadow(color: VZ.laserGlow, radius: configuration.isPressed ? 4 : 14, y: 4)
       .scaleEffect(configuration.isPressed ? 0.97 : 1)
       .animation(VZ.Motion.quickAnimation, value: configuration.isPressed)
@@ -59,22 +62,39 @@ struct QuietButtonStyle: ButtonStyle {
 }
 
 extension ButtonStyle where Self == LaserButtonStyle {
-  static var laser: LaserButtonStyle { LaserButtonStyle() }
-  static var laserInline: LaserButtonStyle { LaserButtonStyle(fullWidth: false) }
+  static var laser: LaserButtonStyle {
+    LaserButtonStyle()
+  }
+
+  static var laserInline: LaserButtonStyle {
+    LaserButtonStyle(fullWidth: false)
+  }
 }
 
 extension ButtonStyle where Self == SecondaryButtonStyle {
-  static var secondary: SecondaryButtonStyle { SecondaryButtonStyle() }
-  static var secondaryInline: SecondaryButtonStyle { SecondaryButtonStyle(fullWidth: false) }
-  static var destructive: SecondaryButtonStyle { SecondaryButtonStyle(tint: VZ.flare) }
+  static var secondary: SecondaryButtonStyle {
+    SecondaryButtonStyle()
+  }
+
+  static var secondaryInline: SecondaryButtonStyle {
+    SecondaryButtonStyle(fullWidth: false)
+  }
+
+  static var destructive: SecondaryButtonStyle {
+    SecondaryButtonStyle(tint: VZ.flare)
+  }
 }
 
 extension ButtonStyle where Self == PressableStyle {
-  static var pressable: PressableStyle { PressableStyle() }
+  static var pressable: PressableStyle {
+    PressableStyle()
+  }
 }
 
 extension ButtonStyle where Self == QuietButtonStyle {
-  static var quiet: QuietButtonStyle { QuietButtonStyle() }
+  static var quiet: QuietButtonStyle {
+    QuietButtonStyle()
+  }
 }
 
 /// A rail chip / segment: Laser fill with on-laser ink when selected, glass otherwise.
@@ -85,7 +105,9 @@ struct ChipLabel: View {
 
   var body: some View {
     HStack(spacing: 6) {
-      if let icon { IconView(icon, size: 14) }
+      if let icon {
+        IconView(icon, size: 14)
+      }
       Text(text)
     }
     .font(.vzBody(13, .medium))

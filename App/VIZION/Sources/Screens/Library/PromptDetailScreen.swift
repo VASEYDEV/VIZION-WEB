@@ -57,10 +57,21 @@ final class PromptDetailViewModel {
     self.promptID = promptID
   }
 
-  var currentID: String? { head?.current_ver ?? versions.last?.id }
-  var current: VersionMeta? { versions.first { $0.id == currentID } ?? versions.last }
-  var currentBody: VersionBody? { currentID.flatMap { bodies[$0] } }
-  var target: TargetModel { head?.target ?? .default }
+  var currentID: String? {
+    head?.current_ver ?? versions.last?.id
+  }
+
+  var current: VersionMeta? {
+    versions.first { $0.id == currentID } ?? versions.last
+  }
+
+  var currentBody: VersionBody? {
+    currentID.flatMap { bodies[$0] }
+  }
+
+  var target: TargetModel {
+    head?.target ?? .default
+  }
 
   func label(_ id: String) -> String {
     versions.firstIndex { $0.id == id }.map { "v\($0 + 1)" } ?? "v?"
@@ -77,14 +88,20 @@ final class PromptDetailViewModel {
       self.head = head
       self.versions = versions
       let current = head.current_ver ?? versions.last?.id
-      if let current { await ensureBody(current) }
+      if let current {
+        await ensureBody(current)
+      }
       if let body = current.flatMap({ bodies[$0] }), reviseDraft.isEmpty {
         reviseDraft = body.output_text
-        reviseMode = current.flatMap { id in versions.first { $0.id == id } }.flatMap { EnhanceMode(rawValue: $0.mode) } ?? .clarify
+        reviseMode = current.flatMap { id in versions.first { $0.id == id } }
+          .flatMap { EnhanceMode(rawValue: $0.mode) } ?? .clarify
       }
       compareB = current
-      compareA = versions.first { $0.id == current }?.parent_ver ?? versions.dropLast().last?.id ?? current
-      if let a = compareA { await ensureBody(a) }
+      compareA = versions.first { $0.id == current }?.parent_ver ?? versions.dropLast().last?
+        .id ?? current
+      if let a = compareA {
+        await ensureBody(a)
+      }
     } catch {
       self.error = error.localizedDescription
     }
@@ -92,7 +109,10 @@ final class PromptDetailViewModel {
 
   func ensureBody(_ id: String) async {
     guard bodies[id] == nil, let library = env.library else { return }
-    if let body = try? await library.versionBody(promptID: promptID, versionID: id) { bodies[id] = body }
+    if let body = try? await library
+      .versionBody(promptID: promptID, versionID: id) {
+      bodies[id] = body
+    }
   }
 
   // MARK: Mutations
@@ -106,8 +126,20 @@ final class PromptDetailViewModel {
     }
   }
 
-  func rename(_ title: String) async { await mutate { try await env.library?.updateTitle(promptID: promptID, title: title) } }
-  func updateTags(_ raw: String) async { await mutate { try await env.library?.updateTags(promptID: promptID, tags: LibraryUtil.parseTags(raw)) } }
+  func rename(_ title: String) async {
+    await mutate { try await env.library?.updateTitle(
+      promptID: promptID,
+      title: title
+    ) }
+  }
+
+  func updateTags(_ raw: String) async {
+    await mutate { try await env.library?.updateTags(
+      promptID: promptID,
+      tags: LibraryUtil.parseTags(raw)
+    ) }
+  }
+
   func restore(_ versionID: String) async {
     await mutate { try await env.library?.restoreVersion(promptID: promptID, versionID: versionID) }
     env.toasts.show("Restored \(label(versionID))")
@@ -115,7 +147,9 @@ final class PromptDetailViewModel {
 
   func toggleFavorite() async {
     guard let head else { return }
-    await mutate { try await env.library?.setFavorite(promptID: promptID, !(head.favorite ?? false)) }
+    await mutate {
+      try await env.library?.setFavorite(promptID: promptID, !(head.favorite ?? false))
+    }
   }
 
   func softDelete() async -> Bool {
@@ -151,17 +185,26 @@ final class PromptDetailViewModel {
         for try await event in api.enhance(request) {
           guard let self else { return }
           if case let .error(status, message, notConfigured, capReached) = event {
-            throw EnhanceFailure(message: message, status: status, notConfigured: notConfigured, capReached: capReached)
+            throw EnhanceFailure(
+              message: message,
+              status: status,
+              notConfigured: notConfigured,
+              capReached: capReached
+            )
           }
           var state = stream
           state.apply(event)
           stream = state
-          if case let .done(result) = event { done = result }
+          if case let .done(result) = event {
+            done = result
+          }
         }
         guard let self, let done else { return }
         revised = (request.input, request.mode, done)
       } catch let failure as EnhanceFailure {
-        if !failure.isCancelled { self?.reviseError = failure }
+        if !failure.isCancelled {
+          self?.reviseError = failure
+        }
       } catch {
         self?.reviseError = EnhanceFailure(message: error.localizedDescription, status: 502)
       }
@@ -178,9 +221,11 @@ final class PromptDetailViewModel {
   func saveRevision() async {
     guard let revised, let library = env.library else { return }
     let input = LibraryRepository.VersionInput(
-      input: revised.input, output: revised.result.output, rationale: revised.result.rationale, mode: revised.mode,
+      input: revised.input, output: revised.result.output, rationale: revised.result.rationale,
+      mode: revised.mode,
       target: revised.result.resolvedTarget ?? target, modelUsed: revised.result.modelUsed,
-      tokenIn: revised.result.tokenIn, tokenOut: revised.result.tokenOut, title: nil)
+      tokenIn: revised.result.tokenIn, tokenOut: revised.result.tokenOut, title: nil
+    )
     do {
       _ = try await library.addVersion(promptID: promptID, input)
       self.revised = nil
@@ -229,8 +274,16 @@ struct PromptDetailView: View {
       Button("Save") { Task { await model.updateTags(tagText) } }
       Button("Cancel", role: .cancel) {}
     }
-    .confirmationDialog("Delete this prompt?", isPresented: $confirmDelete, titleVisibility: .visible) {
-      Button("Delete", role: .destructive) { Task { if await model.softDelete() { dismiss() } } }
+    .confirmationDialog(
+      "Delete this prompt?",
+      isPresented: $confirmDelete,
+      titleVisibility: .visible
+    ) {
+      Button("Delete", role: .destructive) { Task {
+        if await model.softDelete() {
+          dismiss()
+        }
+      } }
     } message: {
       Text("It moves to Recently deleted, where you can restore it.")
     }
@@ -242,18 +295,30 @@ struct PromptDetailView: View {
         Text(head.title).font(.vzDisplay(28)).foregroundStyle(VZ.text)
         Spacer()
         Menu {
-          Button { renameText = head.title; renaming = true } label: { Label("Rename", systemImage: "pencil") }
-          Button { tagText = head.tags.joined(separator: ", "); editingTags = true } label: { Label("Edit tags", systemImage: "tag") }
+          Button { renameText = head.title; renaming = true } label: { Label(
+            "Rename",
+            systemImage: "pencil"
+          ) }
+          Button { tagText = head.tags.joined(separator: ", "); editingTags = true } label: { Label(
+            "Edit tags",
+            systemImage: "tag"
+          ) }
           Button { Task { await model.toggleFavorite() } } label: {
             Label(head.favorite == true ? "Unfavorite" : "Favorite", systemImage: "star")
           }
-          Button(role: .destructive) { confirmDelete = true } label: { Label("Delete", systemImage: "trash") }
+          Button(role: .destructive) { confirmDelete = true } label: { Label(
+            "Delete",
+            systemImage: "trash"
+          ) }
         } label: {
           Text("⋯").font(.vzBody(20)).foregroundStyle(VZ.muted).frame(width: 44, height: 44)
         }
       }
       HStack(spacing: 8) {
-        HStack(spacing: 4) { TargetMark(targetID: head.target_model, size: 13); Text(head.modelLabel) }.foregroundStyle(VZ.accent)
+        HStack(spacing: 4) {
+          TargetMark(targetID: head.target_model, size: 13); Text(head.modelLabel)
+        }
+        .foregroundStyle(VZ.accent)
         ForEach(head.tags, id: \.self) { Text("#\($0)") }
         Text("\(model.versions.count) version\(model.versions.count == 1 ? "" : "s")")
       }
@@ -272,12 +337,14 @@ struct PromptDetailView: View {
             env.toasts.show("Copied")
           } label: { IconView(.copy, size: 16) }.buttonStyle(.quiet)
           ShareLink(item: body.output_text) { IconView(.share, size: 16) }.buttonStyle(.quiet)
-            .simultaneousGesture(TapGesture().onEnded { Task { try? await env.library?.logShare(promptID: model.promptID) } })
+            .simultaneousGesture(TapGesture()
+              .onEnded { Task { try? await env.library?.logShare(promptID: model.promptID) } })
         }
       }
       if let body = model.currentBody {
         Text(body.output_text).font(.vzMono(14)).foregroundStyle(VZ.text).textSelection(.enabled)
-          .frame(maxWidth: .infinity, alignment: .leading).padding(14).vzGlassSolid(cornerRadius: VZ.Radius.control)
+          .frame(maxWidth: .infinity, alignment: .leading).padding(14)
+          .vzGlassSolid(cornerRadius: VZ.Radius.control)
         if let rationale = body.rationale, !rationale.isEmpty {
           Text(rationale).font(.vzBody(13)).foregroundStyle(VZ.muted)
         }
@@ -293,13 +360,16 @@ struct PromptDetailView: View {
       VStack(spacing: 0) {
         ForEach(model.versions.reversed()) { version in
           HStack(spacing: 10) {
-            Text(model.label(version.id)).font(.vzBody(13, .semibold)).foregroundStyle(version.id == model.currentID ? VZ.accent : VZ.text)
+            Text(model.label(version.id)).font(.vzBody(13, .semibold))
+              .foregroundStyle(version.id == model.currentID ? VZ.accent : VZ.text)
             Text(version.modeLabel).font(.vzBody(12)).foregroundStyle(VZ.muted)
             Text(version.model_used).font(.vzBody(11)).foregroundStyle(VZ.muted).lineLimit(1)
             Spacer()
-            Text(LibraryUtil.relativeTime(iso: version.created_at)).font(.vzBody(11)).foregroundStyle(VZ.muted)
+            Text(LibraryUtil.relativeTime(iso: version.created_at)).font(.vzBody(11))
+              .foregroundStyle(VZ.muted)
             if version.id != model.currentID {
-              Button("Restore") { Task { await model.restore(version.id) } }.buttonStyle(.secondaryInline)
+              Button("Restore") { Task { await model.restore(version.id) } }
+                .buttonStyle(.secondaryInline)
             }
           }
           .padding(.horizontal, 14).padding(.vertical, 10)
@@ -314,15 +384,37 @@ struct PromptDetailView: View {
     VStack(alignment: .leading, spacing: 8) {
       SectionCaption(text: "Compare", icon: .eye)
       HStack(spacing: 8) {
-        versionPicker("From", selection: Binding(get: { model.compareA }, set: { model.compareA = $0; if let id = $0 { Task { await model.ensureBody(id) } } }))
-        versionPicker("To", selection: Binding(get: { model.compareB }, set: { model.compareB = $0; if let id = $0 { Task { await model.ensureBody(id) } } }))
+        versionPicker(
+          "From",
+          selection: Binding(
+            get: { model.compareA },
+            set: {
+              model.compareA = $0; if let id = $0 {
+                Task { await model.ensureBody(id) }
+              }
+            }
+          )
+        )
+        versionPicker(
+          "To",
+          selection: Binding(
+            get: { model.compareB },
+            set: {
+              model.compareB = $0; if let id = $0 {
+                Task { await model.ensureBody(id) }
+              }
+            }
+          )
+        )
       }
-      if let a = model.compareA.flatMap({ model.bodies[$0] }), let b = model.compareB.flatMap({ model.bodies[$0] }) {
+      if let a = model.compareA.flatMap({ model.bodies[$0] }),
+         let b = model.compareB.flatMap({ model.bodies[$0] }) {
         if a.id == b.id {
           Text("Pick two different versions.").font(.vzBody(12)).foregroundStyle(VZ.muted)
         } else if let diff = WordDiff.boundedDiffWords(a.output_text, b.output_text) {
           VStack(alignment: .leading, spacing: 6) {
-            Text("\(WordDiff.countChangedSections(diff)) changes").font(.vzBody(11)).foregroundStyle(VZ.muted)
+            Text("\(WordDiff.countChangedSections(diff)) changes").font(.vzBody(11))
+              .foregroundStyle(VZ.muted)
             DiffText(segments: diff, side: .output).font(.vzMono(13)).foregroundStyle(VZ.text)
               .frame(maxWidth: .infinity, alignment: .leading).padding(12).vzScrim()
           }
@@ -354,17 +446,22 @@ struct PromptDetailView: View {
   private var revisePanel: some View {
     VStack(alignment: .leading, spacing: 10) {
       SectionCaption(text: "Revise", icon: .enhance)
-      Text("Iterate on the current result with \(model.target.label); saving appends a version.").font(.vzBody(12)).foregroundStyle(VZ.muted)
+      Text("Iterate on the current result with \(model.target.label); saving appends a version.")
+        .font(.vzBody(12)).foregroundStyle(VZ.muted)
       ModeRigView(activeMode: $model.reviseMode)
       TextEditor(text: $model.reviseDraft).font(.vzBody(15)).foregroundStyle(VZ.text)
-        .scrollContentBackground(.hidden).frame(minHeight: 120).padding(8).vzGlassSolid(cornerRadius: VZ.Radius.control)
+        .scrollContentBackground(.hidden).frame(minHeight: 120).padding(8)
+        .vzGlassSolid(cornerRadius: VZ.Radius.control)
       if model.revising {
         StreamProgressView(stream: model.stream) { model.cancelRevise() }
       } else {
         Button("Run \(model.reviseMode.label)") { model.revise() }.buttonStyle(.laser)
           .disabled(model.reviseDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
-      if let error = model.reviseError { Text(error.displayMessage).font(.vzBody(13)).foregroundStyle(VZ.flare) }
+      if let error = model
+        .reviseError {
+        Text(error.displayMessage).font(.vzBody(13)).foregroundStyle(VZ.flare)
+      }
       if let revised = model.revised {
         VStack(alignment: .leading, spacing: 8) {
           if let diff = revised.result.diff {
@@ -373,17 +470,21 @@ struct PromptDetailView: View {
             Text(revised.result.output)
           }
           HStack {
-            Button("Save as version") { Task { await model.saveRevision() } }.buttonStyle(.laserInline)
+            Button("Save as version") { Task { await model.saveRevision() } }
+              .buttonStyle(.laserInline)
             Button("Copy") {
               UIPasteboard.general.string = revised.result.output
               env.toasts.show("Copied")
             }.buttonStyle(.secondaryInline)
           }
-          Text("\(revised.result.tokenIn)→\(revised.result.tokenOut) tok · $\(revised.result.costUsd, specifier: "%.4f") · \(revised.result.modelUsed)")
+          let stats = revised.result
+          let cost = String(format: "%.4f", stats.costUsd)
+          Text("\(stats.tokenIn)→\(stats.tokenOut) tok · $\(cost) · \(stats.modelUsed)")
             .font(.vzBody(11)).monospacedDigit().foregroundStyle(VZ.muted)
         }
         .font(.vzMono(13)).foregroundStyle(VZ.text)
-        .frame(maxWidth: .infinity, alignment: .leading).padding(14).vzGlassSolid(cornerRadius: VZ.Radius.control)
+        .frame(maxWidth: .infinity, alignment: .leading).padding(14)
+        .vzGlassSolid(cornerRadius: VZ.Radius.control)
       }
     }
   }

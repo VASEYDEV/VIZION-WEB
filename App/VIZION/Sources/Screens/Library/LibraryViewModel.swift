@@ -11,7 +11,15 @@ import VizionCore
 final class LibraryViewModel {
   let env: AppEnvironment
 
-  var filter = LibraryFilter.default { didSet { if filter != oldValue { Task { await reload() } } } }
+  var filter = LibraryFilter
+    .default {
+    didSet {
+      if filter != oldValue {
+        Task { await reload() }
+      }
+    }
+  }
+
   var searchDraft = ""
   private(set) var cards: [PromptCard] = []
   private(set) var drafts: [DraftCard] = []
@@ -22,28 +30,42 @@ final class LibraryViewModel {
   private(set) var loadingMore = false
   private(set) var error: String?
   private(set) var draftsUnavailable = false
+  /// Bumped per reload; a response from an older generation is discarded so
+  /// rapid filter changes can't show results for a filter no longer selected.
+  private var reloadGeneration = 0
 
   init(env: AppEnvironment) {
     self.env = env
   }
 
-  private var library: LibraryRepository? { env.library }
+  private var library: LibraryRepository? {
+    env.library
+  }
 
   func submitSearch() {
     let q = searchDraft.trimmingCharacters(in: .whitespacesAndNewlines)
     filter = LibraryFilter(
       q: q.isEmpty ? nil : q, model: filter.model, mode: filter.mode, tag: filter.tag,
-      collection: filter.collection, view: filter.view, sort: filter.sort)
+      collection: filter.collection, view: filter.view, sort: filter.sort
+    )
   }
 
   func reload() async {
     guard let library else { return }
+    reloadGeneration += 1
+    let generation = reloadGeneration
+    let filter = filter
     loading = true
     error = nil
-    defer { loading = false }
+    defer {
+      if generation == reloadGeneration {
+        loading = false
+      }
+    }
     do {
       if filter.isDraftsView {
         let page = try await library.draftsPage(filter: filter)
+        guard generation == reloadGeneration else { return }
         drafts = page.cards
         nextCursor = page.nextCursor
         draftsUnavailable = false
@@ -52,18 +74,23 @@ final class LibraryViewModel {
         async let facetsTask = library.facets()
         async let activityTask = library.activity()
         let (page, facets, activity) = try await (pageTask, facetsTask, activityTask)
+        guard generation == reloadGeneration else { return }
         cards = page.cards
         nextCursor = page.nextCursor
         self.facets = facets
         self.activity = activity
       }
     } catch {
+      guard generation == reloadGeneration else { return }
       let text = "\(error)"
       if filter.isDraftsView, text.contains("PGRST205") {
         draftsUnavailable = true
         drafts = []
       } else {
-        self.error = "Couldn't load your library — your prompts are safe on the server. Check your connection and retry."
+        self.error = """
+        Couldn't load your library — your prompts are safe on the server. \
+        Check your connection and retry.
+        """
       }
     }
   }
@@ -160,11 +187,14 @@ final class LibraryViewModel {
       let body = try await library.draftBody(id: draft.id)
       let ui = env.ui
       ui.editorDraft = body.body
-      if let mode = EnhanceMode(rawValue: draft.mode) { ui.activeMode = mode }
+      if let mode = EnhanceMode(rawValue: draft.mode) {
+        ui.activeMode = mode
+      }
       if let target = TargetModel.resolve(draft.targetModel) {
         ui.targetModel = target
         ui.autoTarget = false
-        if let level = draft.thinkingLevel.flatMap(ThinkingLevel.init(rawValue:)), target.thinkingLadder.contains(level) {
+        if let level = draft.thinkingLevel.flatMap(ThinkingLevel.init(rawValue:)),
+           target.thinkingLadder.contains(level) {
           ui.thinkingLevels[target] = level
         } else {
           ui.thinkingLevels.removeValue(forKey: target)
@@ -202,7 +232,13 @@ final class LibraryViewModel {
     let ui = env.ui
     do {
       _ = try await library?.saveDraft(
-        LibraryRepository.DraftInput(body: ui.editorDraft, target: ui.targetModel, mode: ui.activeMode, thinkingLevel: ui.thinkingLevel))
+        LibraryRepository.DraftInput(
+          body: ui.editorDraft,
+          target: ui.targetModel,
+          mode: ui.activeMode,
+          thinkingLevel: ui.thinkingLevel
+        )
+      )
       await reload()
       return true
     } catch {

@@ -34,8 +34,13 @@ final class EnhanceViewModel {
     self.env = env
   }
 
-  var ui: UIStore { env.ui }
-  var view: EnhanceView? { env.results.view }
+  var ui: UIStore {
+    env.ui
+  }
+
+  var view: EnhanceView? {
+    env.results.view
+  }
 
   // MARK: Draft intake
 
@@ -57,7 +62,9 @@ final class EnhanceViewModel {
     env.toasts.show("Draft replaced", actionLabel: "Undo") { [ui] in ui.editorDraft = prior }
   }
 
-  func discardDraftOffer() { draftOffer = nil }
+  func discardDraftOffer() {
+    draftOffer = nil
+  }
 
   func paste() {
     guard let text = UIPasteboard.general.string, !text.isEmpty else {
@@ -94,11 +101,30 @@ final class EnhanceViewModel {
 
   // MARK: Run
 
-  var tokenEstimate: Int { EnhanceStreamState.estimateTokens(chars: ui.editorDraft.utf16.count) }
+  var tokenEstimate: Int {
+    EnhanceStreamState.estimateTokens(chars: ui.editorDraft.utf16.count)
+  }
+
+  /// True while any attachment is still reserving/uploading/analyzing — a run
+  /// started now would silently drop the visual context the user attached.
+  var attachmentsPending: Bool {
+    attachments.contains { attachment in
+      switch attachment.status {
+      case .ready, .error: false
+      case .queued, .reserving, .uploading, .analyzing: true
+      }
+    }
+  }
 
   var contextBlocks: [String] {
     MediaContext.build(attachments.map {
-      MediaContextItem(role: $0.role, isReady: $0.status == .ready, name: $0.name, description: $0.description, attrs: $0.attrs)
+      MediaContextItem(
+        role: $0.role,
+        isReady: $0.status == .ready,
+        name: $0.name,
+        description: $0.description,
+        attrs: $0.attrs
+      )
     })
   }
 
@@ -113,7 +139,9 @@ final class EnhanceViewModel {
       return
     }
     let submitted = EnhanceView.Submitted(
-      input: request.input, mode: request.mode, target: request.target, format: request.format, length: request.length)
+      input: request.input, mode: request.mode, target: request.target, format: request.format,
+      length: request.length
+    )
     start(request, submitted: submitted, refined: false)
   }
 
@@ -125,7 +153,8 @@ final class EnhanceViewModel {
     let request = EnhanceRequest(
       input: view.effectiveOutput, mode: view.submitted.mode, target: view.effectiveTarget,
       format: view.submitted.format, length: view.submitted.length,
-      thinkingLevel: ui.thinkingLevels[view.effectiveTarget].flatMap { view.effectiveTarget.thinkingLadder.contains($0) ? $0 : nil },
+      thinkingLevel: ui.thinkingLevels[view.effectiveTarget]
+        .flatMap { view.effectiveTarget.thinkingLadder.contains($0) ? $0 : nil },
       refine: EnhanceRefine(kind: kind, baseInput: baseInput)
     )
     refinePending = true
@@ -139,7 +168,10 @@ final class EnhanceViewModel {
     let request = EnhanceRequest(
       input: view.submitted.input, mode: view.submitted.mode, target: view.effectiveTarget,
       format: view.submitted.format, length: view.submitted.length,
-      refine: EnhanceRefine(kind: .answers, baseInput: EnhanceRefine.answersBlock(questions: questions, answers: answers))
+      refine: EnhanceRefine(
+        kind: .answers,
+        baseInput: EnhanceRefine.answersBlock(questions: questions, answers: answers)
+      )
     )
     start(request, submitted: view.submitted, refined: false)
   }
@@ -152,51 +184,53 @@ final class EnhanceViewModel {
     isRunning = true
     let userID = env.session?.userID
     runTask = Task { [weak self] in
+      // Deltas are batched so the editor doesn't re-render per token.
       var pendingText = ""
       var lastFlush = ContinuousClock.now
-      func flush(_ state: inout EnhanceStreamState) {
-        guard !pendingText.isEmpty else { return }
-        state.apply(.delta(text: pendingText))
-        pendingText = ""
-        lastFlush = .now
-      }
       do {
         var done: EnhanceResult?
         for try await event in api.enhance(request) {
           guard let self else { return }
           switch event {
           case let .delta(text):
-            // Batch deltas so the editor doesn't re-render per token.
             pendingText += text
             if ContinuousClock.now - lastFlush > .milliseconds(40) {
-              var state = stream
-              flush(&state)
-              stream = state
+              flush(&pendingText)
+              lastFlush = .now
             }
           case let .error(status, message, notConfigured, capReached):
-            throw EnhanceFailure(message: message, status: status, notConfigured: notConfigured, capReached: capReached)
+            throw EnhanceFailure(
+              message: message,
+              status: status,
+              notConfigured: notConfigured,
+              capReached: capReached
+            )
           case let .done(result):
             done = result
-            var state = stream
-            flush(&state)
-            state.apply(event)
-            stream = state
+            flush(&pendingText, applying: event)
           default:
-            var state = stream
-            flush(&state)
-            state.apply(event)
-            stream = state
+            flush(&pendingText, applying: event)
           }
         }
         guard let self else { return }
-        var state = stream
-        flush(&state)
-        stream = state
-        guard let done else { throw EnhanceFailure(message: "The stream ended unexpectedly.", status: 502) }
-        env.results.set(EnhanceView(submitted: submitted, result: done, refined: refined ? true : nil, rejected: nil), userID: userID)
+        flush(&pendingText)
+        guard let done else {
+          throw EnhanceFailure(message: "The stream ended unexpectedly.", status: 502)
+        }
+        env.results.set(
+          EnhanceView(
+            submitted: submitted,
+            result: done,
+            refined: refined ? true : nil,
+            rejected: nil
+          ),
+          userID: userID
+        )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
       } catch let failure as EnhanceFailure {
-        if !failure.isCancelled { self?.error = failure }
+        if !failure.isCancelled {
+          self?.error = failure
+        }
       } catch {
         if !(error is CancellationError) {
           self?.error = EnhanceFailure(message: error.localizedDescription, status: 502)
@@ -211,6 +245,21 @@ final class EnhanceViewModel {
     }
   }
 
+  /// Applies the batched delta text — and, optionally, the event that ended
+  /// the batch — to the stream state in one mutation, so observers see a
+  /// single change per flush.
+  private func flush(_ pending: inout String, applying event: EnhanceStreamEvent? = nil) {
+    var state = stream
+    if !pending.isEmpty {
+      state.apply(.delta(text: pending))
+      pending = ""
+    }
+    if let event {
+      state.apply(event)
+    }
+    stream = state
+  }
+
   func cancel() {
     runTask?.cancel()
     runTask = nil
@@ -222,7 +271,7 @@ final class EnhanceViewModel {
   // MARK: Result actions
 
   func copyOutput() {
-        guard let view else { return }
+    guard let view else { return }
     UIPasteboard.general.string = view.effectiveOutput
     UIImpactFeedbackGenerator(style: .light).impactOccurred()
     env.toasts.show("Copied")
@@ -233,7 +282,8 @@ final class EnhanceViewModel {
     guard let view else { return }
     let prior = ui.editorDraft
     ui.editorDraft = view.effectiveOutput
-    env.toasts.show("Result moved into the editor", actionLabel: "Undo") { [ui] in ui.editorDraft = prior }
+    env.toasts
+      .show("Result moved into the editor", actionLabel: "Undo") { [ui] in ui.editorDraft = prior }
   }
 
   func setRejected(_ rejected: Set<Int>) {
@@ -245,7 +295,8 @@ final class EnhanceViewModel {
     return LibraryRepository.VersionInput(
       input: view.submitted.input, output: view.effectiveOutput, rationale: view.result.rationale,
       mode: view.submitted.mode, target: view.effectiveTarget, modelUsed: view.result.modelUsed,
-      tokenIn: view.result.tokenIn, tokenOut: view.result.tokenOut, title: title ?? view.result.title
+      tokenIn: view.result.tokenIn, tokenOut: view.result.tokenOut,
+      title: title ?? view.result.title
     )
   }
 
@@ -256,9 +307,11 @@ final class EnhanceViewModel {
       mode: view.submitted.mode, target: view.effectiveTarget, modelUsed: view.result.modelUsed
     )
   }
+}
 
-  // MARK: Attachments
+// MARK: - Attachments
 
+extension EnhanceViewModel {
   struct Attachment: Identifiable, Hashable, Sendable {
     enum Status: Hashable, Sendable {
       case queued
@@ -335,12 +388,15 @@ final class EnhanceViewModel {
         env.toasts.error("Only images are supported on iOS for now.")
         continue
       }
-      let normalized = ImageProcessing.normalize(data)
+      let prepared = ImageProcessing.prepare(data, mime: mime)
+      let stem = item.itemIdentifier.map { String($0.prefix(8)) } ?? "photo"
       let attachment = Attachment(
-        name: item.itemIdentifier.map { "\($0.prefix(8)).jpg" } ?? "photo.jpg",
-        kind: .image, mime: MediaKind.kind(forMIME: mime) != nil ? mime : "image/jpeg",
-        bytes: normalized.original.count, thumbnail: normalized.thumbnail, ephemeral: !ui.mediaStoreByDefault,
-        genTarget: .default(for: .image), analysisJPEG: normalized.analysis, original: normalized.original
+        name: "\(stem).\(prepared.fileExtension)",
+        kind: .image, mime: prepared.mime,
+        bytes: prepared.storage.count, thumbnail: prepared.thumbnail,
+        ephemeral: !ui.mediaStoreByDefault,
+        genTarget: .default(for: .image), analysisJPEG: prepared.analysis,
+        original: prepared.storage
       )
       attachments.append(attachment)
     }
@@ -383,9 +439,14 @@ final class EnhanceViewModel {
     case .generate:
       let attrs = a.attrs ?? MediaAttributes(description: a.description)
       let prior = ui.editorDraft
-      ui.editorDraft = GenerationPrompt.build(base: ui.editorDraft, attrs: attrs, target: a.genTarget)
+      ui.editorDraft = GenerationPrompt.build(
+        base: ui.editorDraft,
+        attrs: attrs,
+        target: a.genTarget
+      )
       attachments[index].inserted = true
-      env.toasts.show("Generation prompt built", actionLabel: "Undo") { [ui] in ui.editorDraft = prior }
+      env.toasts
+        .show("Generation prompt built", actionLabel: "Undo") { [ui] in ui.editorDraft = prior }
       return
     }
     guard !snippet.isEmpty else { return }
@@ -410,13 +471,21 @@ final class EnhanceViewModel {
     guard let api = env.api, let profiles = env.profiles else { return }
     let id = attachments[index].id
     func patch(_ change: (inout Attachment) -> Void) {
-      if let i = attachments.firstIndex(where: { $0.id == id }) { change(&attachments[i]) }
+      if let i = attachments.firstIndex(where: { $0.id == id }) {
+        change(&attachments[i])
+      }
     }
     var a = attachments[index]
     do {
       if !a.ephemeral, a.assetID == nil, let original = a.original {
         patch { $0.status = .reserving }
-        let reserved = try await profiles.storeAttachment(data: original, name: a.name, mime: a.mime, kind: a.kind, role: a.role)
+        let reserved = try await profiles.storeAttachment(
+          data: original,
+          name: a.name,
+          mime: a.mime,
+          kind: a.kind,
+          role: a.role
+        )
         patch {
           $0.assetID = reserved.id
           $0.storagePath = reserved.storage_path
@@ -433,10 +502,21 @@ final class EnhanceViewModel {
       }
       let response = try await api.analyze(
         MediaAnalysisRequest(
-          dataUrl: MediaAnalysisRequest.dataURL(mime: "image/jpeg", base64: jpeg.base64EncodedString()),
+          dataUrl: MediaAnalysisRequest.dataURL(
+            mime: "image/jpeg",
+            base64: jpeg.base64EncodedString()
+          ),
           target: target, intent: intent, auto: ui.autoTarget, autoPreference: ui.autoPreference
-        ))
-      a = attachments.first { $0.id == id } ?? a
+        )
+      )
+      // The role may have changed while the request was in flight. A different
+      // intent family means this payload is stale: leave the item queued so the
+      // worker loop re-analyzes it, never mark it ready with the wrong result.
+      guard let live = attachments.first(where: { $0.id == id }) else { return }
+      guard live.role.analysisIntent == intent else {
+        patch { $0.status = .queued }
+        return
+      }
       patch {
         $0.status = .ready
         $0.analyzedIntent = intent
@@ -453,7 +533,8 @@ final class EnhanceViewModel {
         $0.original = nil
       }
       if let fallback = response.fallbackFrom {
-        env.toasts.show("\(fallback.label) can't read images — analyzed with \(response.usage.target?.label ?? response.modelUsed).")
+        let analyzedWith = response.usage.target?.label ?? response.modelUsed
+        env.toasts.show("\(fallback.label) can't read images — analyzed with \(analyzedWith).")
       }
     } catch let failure as EnhanceFailure {
       patch { $0.status = .error(failure.displayMessage) }
@@ -466,28 +547,51 @@ final class EnhanceViewModel {
 /// JPEG normalization for attachments: a bounded analysis copy for the
 /// vision call, a thumbnail for the tray, and the original bytes for storage.
 enum ImageProcessing {
-  static let analysisMaxEdge: CGFloat = 1_568
+  static let analysisMaxEdge: CGFloat = 1568
   static let thumbnailEdge: CGFloat = 160
 
-  struct Output {
-    var original: Data
+  struct Prepared {
+    var storage: Data
+    var mime: String
+    var fileExtension: String
     var analysis: Data?
     var thumbnail: Data?
   }
 
-  static func normalize(_ data: Data) -> Output {
-    guard let image = UIImage(data: data) else { return Output(original: data) }
-    let analysis = resized(image, maxEdge: analysisMaxEdge)?.jpegData(compressionQuality: 0.85)
-    let thumbnail = resized(image, maxEdge: thumbnailEdge)?.jpegData(compressionQuality: 0.7)
-    // HEIC from the picker transcodes to JPEG so the `media` bucket accepts it.
-    let original = data.count > 0 && UIImage(data: data) != nil ? (image.jpegData(compressionQuality: 0.92) ?? data) : data
-    return Output(original: original, analysis: analysis, thumbnail: thumbnail)
+  /// Bytes that go to storage keep their ORIGINAL encoding and MIME when the
+  /// `media` bucket already allows it (PNG/JPEG/WebP/GIF — an animated GIF
+  /// must not be flattened); anything else (HEIC, unknown) is transcoded to
+  /// JPEG and reported as such, so path, Content-Type and bytes always agree.
+  static func prepare(_ data: Data, mime: String) -> Prepared {
+    let image = UIImage(data: data)
+    let allowed = MediaKind.kind(forMIME: mime) == .image
+    let storage: Data
+    let storageMime: String
+    if allowed {
+      storage = data
+      storageMime = mime.lowercased()
+    } else {
+      storage = image?.jpegData(compressionQuality: 0.92) ?? data
+      storageMime = "image/jpeg"
+    }
+    let analysis = image
+      .flatMap { resized($0, maxEdge: analysisMaxEdge)?.jpegData(compressionQuality: 0.85) }
+    let thumbnail = image
+      .flatMap { resized($0, maxEdge: thumbnailEdge)?.jpegData(compressionQuality: 0.7) }
+    return Prepared(
+      storage: storage, mime: storageMime,
+      fileExtension: MediaKind.fileExtension(forMIME: storageMime),
+      analysis: analysis, thumbnail: thumbnail
+    )
   }
 
   static func resized(_ image: UIImage, maxEdge: CGFloat) -> UIImage? {
     let size = image.size
     let scale = min(1, maxEdge / max(size.width, size.height))
-    let target = CGSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
+    let target = CGSize(
+      width: (size.width * scale).rounded(),
+      height: (size.height * scale).rounded()
+    )
     let format = UIGraphicsImageRendererFormat.default()
     format.scale = 1
     return UIGraphicsImageRenderer(size: target, format: format).image { _ in
@@ -502,10 +606,16 @@ enum ImageProcessing {
     let origin = CGPoint(x: (image.size.width - side) / 2, y: (image.size.height - side) / 2)
     let format = UIGraphicsImageRendererFormat.default()
     format.scale = 1
-    let cropped = UIGraphicsImageRenderer(size: CGSize(width: edge, height: edge), format: format).image { _ in
-      let scale = edge / side
-      image.draw(in: CGRect(x: -origin.x * scale, y: -origin.y * scale, width: image.size.width * scale, height: image.size.height * scale))
-    }
+    let cropped = UIGraphicsImageRenderer(size: CGSize(width: edge, height: edge), format: format)
+      .image { _ in
+        let scale = edge / side
+        image.draw(in: CGRect(
+          x: -origin.x * scale,
+          y: -origin.y * scale,
+          width: image.size.width * scale,
+          height: image.size.height * scale
+        ))
+      }
     return cropped.pngData()
   }
 }

@@ -1,14 +1,14 @@
-import XCTest
 @testable import VizionCore
+import XCTest
 
 final class RosterTests: XCTestCase {
-  func testSixteenTargetsGroupedContiguouslyInDeveloperOrder() {
+  func testSixteenTargetsGroupedContiguouslyInDeveloperOrder() throws {
     XCTAssertEqual(TargetModel.allCases.count, 16)
     XCTAssertEqual(Developer.allCases.count, 12)
     // Roster order is grouped by developer in Developer.allCases order.
     var lastIndex = -1
     for target in TargetModel.allCases {
-      let index = Developer.allCases.firstIndex(of: target.developer)!
+      let index = try XCTUnwrap(Developer.allCases.firstIndex(of: target.developer))
       XCTAssertGreaterThanOrEqual(index, lastIndex, "\(target) breaks developer grouping")
       lastIndex = index
     }
@@ -17,13 +17,19 @@ final class RosterTests: XCTestCase {
   }
 
   func testAnthropicAndOpenAILeadTheRoster() {
-    XCTAssertEqual(TargetModel.allCases.prefix(3).map(\.developer), [.anthropic, .anthropic, .anthropic])
-    XCTAssertEqual(TargetModel.allCases[3...5].map(\.developer), [.openai, .openai, .openai])
-    XCTAssertEqual(TargetModel.allCases[3...5].map(\.label), ["GPT-5.6 Sol", "GPT-5.6 Terra", "GPT-5.6 Luna"])
+    XCTAssertEqual(
+      TargetModel.allCases.prefix(3).map(\.developer),
+      [.anthropic, .anthropic, .anthropic]
+    )
+    XCTAssertEqual(TargetModel.allCases[3 ... 5].map(\.developer), [.openai, .openai, .openai])
+    XCTAssertEqual(
+      TargetModel.allCases[3 ... 5].map(\.label),
+      ["GPT-5.6 Sol", "GPT-5.6 Terra", "GPT-5.6 Luna"]
+    )
   }
 
   func testWireIdsMatchTheDatabaseEnum() {
-    let expected: Set<String> = [
+    let expected: Set = [
       "opus_5", "sonnet_5", "gpt_5_6_sol", "fable_5", "deepseek_v4", "gemini_3_6_flash",
       "muse_spark_1_1", "minimax_m3", "mistral_large_3", "kimi_k3", "sonar_pro", "qwen3_8_max",
       "grok_4_5", "glm_5_2", "gpt_5_6_luna", "gpt_5_6_terra",
@@ -56,7 +62,10 @@ final class RosterTests: XCTestCase {
   }
 
   func testModesDisplayOrderAndLabels() {
-    XCTAssertEqual(EnhanceMode.allCases.map(\.label), ["Clarify", "Polish", "Expand", "Condense", "Reformat", "Adapt"])
+    XCTAssertEqual(
+      EnhanceMode.allCases.map(\.label),
+      ["Clarify", "Polish", "Expand", "Condense", "Reformat", "Adapt"]
+    )
     XCTAssertEqual(EnhanceMode.target.rawValue, "target")
     XCTAssertTrue(EnhanceMode.polish.isShapePreserving)
     XCTAssertFalse(EnhanceMode.expand.isShapePreserving)
@@ -65,8 +74,14 @@ final class RosterTests: XCTestCase {
   }
 
   func testLengthLabelsArePerMode() {
-    XCTAssertEqual(EnhanceMode.condense.lengthOptions?.map(\.label), ["Tight", "Balanced", "Essential"])
-    XCTAssertEqual(EnhanceMode.expand.lengthOptions?.map(\.label), ["Focused", "Thorough", "Comprehensive"])
+    XCTAssertEqual(
+      EnhanceMode.condense.lengthOptions?.map(\.label),
+      ["Tight", "Balanced", "Essential"]
+    )
+    XCTAssertEqual(
+      EnhanceMode.expand.lengthOptions?.map(\.label),
+      ["Focused", "Thorough", "Comprehensive"]
+    )
     XCTAssertNil(EnhanceMode.polish.lengthOptions)
   }
 

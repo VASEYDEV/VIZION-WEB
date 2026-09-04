@@ -10,7 +10,8 @@ struct DeveloperIcon: View {
   private static let cache: [Developer: [SVGPathCommand]] = Dictionary(
     uniqueKeysWithValues: Developer.allCases.map { developer in
       (developer, (try? SVGPathParser.parse(DeveloperMark.mark(for: developer).d)) ?? [])
-    })
+    }
+  )
 
   var body: some View {
     let mark = DeveloperMark.mark(for: developer)

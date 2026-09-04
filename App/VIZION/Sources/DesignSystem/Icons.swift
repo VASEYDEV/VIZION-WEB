@@ -36,6 +36,7 @@ enum VZIcon: String, CaseIterable, Sendable {
   case eye
   case send
 
+  // swiftlint:disable line_length
   var d: String {
     switch self {
     case .enhance:
@@ -81,10 +82,15 @@ enum VZIcon: String, CaseIterable, Sendable {
     }
   }
 
-  var commands: [SVGPathCommand] { Self.cache[self] ?? [] }
+  // swiftlint:enable line_length
+
+  var commands: [SVGPathCommand] {
+    Self.cache[self] ?? []
+  }
 
   private static let cache: [VZIcon: [SVGPathCommand]] = Dictionary(
-    uniqueKeysWithValues: allCases.map { ($0, (try? SVGPathParser.parse($0.d)) ?? []) })
+    uniqueKeysWithValues: allCases.map { ($0, (try? SVGPathParser.parse($0.d)) ?? []) }
+  )
 
   static func mode(_ mode: EnhanceMode) -> VZIcon {
     switch mode {
@@ -106,7 +112,14 @@ struct IconView: View {
   var strokeWidth: CGFloat = 1.5
   var filled = false
 
-  init(_ icon: VZIcon, size: CGFloat = 20, strokeWidth: CGFloat = 1.5, filled: Bool = false) {
+  /// `nonisolated`: an explicit init on a View is main-actor isolated, and a
+  /// PhotosPicker label closure is not — every stored value here is Sendable.
+  nonisolated init(
+    _ icon: VZIcon,
+    size: CGFloat = 20,
+    strokeWidth: CGFloat = 1.5,
+    filled: Bool = false
+  ) {
     self.icon = icon
     self.size = size
     self.strokeWidth = strokeWidth
@@ -116,9 +129,12 @@ struct IconView: View {
   var body: some View {
     let shape = SVGShape(commands: icon.commands, viewBox: CGSize(width: 24, height: 24))
     ZStack {
-      if filled { shape.fill(.primary) }
+      if filled {
+        shape.fill(.primary)
+      }
       shape.stroke(
-        style: StrokeStyle(lineWidth: strokeWidth * (size / 24), lineCap: .round, lineJoin: .round))
+        style: StrokeStyle(lineWidth: strokeWidth * (size / 24), lineCap: .round, lineJoin: .round)
+      )
     }
     .frame(width: size, height: size)
     .accessibilityHidden(true)

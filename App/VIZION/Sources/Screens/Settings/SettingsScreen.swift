@@ -19,11 +19,14 @@ struct SettingsScreen: View {
             DefaultsSection(profile: profile)
             AppearanceSection(profile: profile)
             DataPrivacySection()
-            if env.isOwner { OwnerSection() }
+            if env.isOwner {
+              OwnerSection()
+            }
             AboutSection()
           } else {
             Text("We couldn't load your settings. Pull to refresh.")
-              .font(.vzBody(13)).foregroundStyle(VZ.muted).padding(20).frame(maxWidth: .infinity).vzGlass()
+              .font(.vzBody(13)).foregroundStyle(VZ.muted).padding(20).frame(maxWidth: .infinity)
+              .vzGlass()
           }
           VizionFooter()
         }
@@ -58,7 +61,9 @@ struct SettingsRow<Trailing: View>: View {
     HStack(alignment: .center, spacing: 12) {
       VStack(alignment: .leading, spacing: 2) {
         Text(label).font(.vzBody(15)).foregroundStyle(VZ.text)
-        if let detail { Text(detail).font(.vzBody(12)).foregroundStyle(VZ.muted) }
+        if let detail {
+          Text(detail).font(.vzBody(12)).foregroundStyle(VZ.muted)
+        }
       }
       Spacer(minLength: 8)
       trailing
@@ -82,14 +87,20 @@ struct FieldStatus: View {
 
 /// Optimistic write helper: apply, round-trip, roll back on failure.
 @MainActor
-func settingWrite(_ status: Binding<FieldStatus.Status>, rollback: @escaping () -> Void = {}, _ work: @escaping () async throws -> Void) {
+func settingWrite(
+  _ status: Binding<FieldStatus.Status>,
+  rollback: @escaping () -> Void = {},
+  work: @escaping () async throws -> Void
+) {
   Task {
     status.wrappedValue = .saving
     do {
       try await work()
       status.wrappedValue = .saved
       try? await Task.sleep(for: .seconds(2))
-      if status.wrappedValue == .saved { status.wrappedValue = .idle }
+      if status.wrappedValue == .saved {
+        status.wrappedValue = .idle
+      }
     } catch {
       rollback()
       status.wrappedValue = .failed(error.localizedDescription)
@@ -108,8 +119,14 @@ struct IdentitySection: View {
   @State private var avatarStatus: FieldStatus.Status = .idle
   @State private var avatarPick: PhotosPickerItem?
 
-  private var dirty: Bool { fullName != (profile.full_name ?? "") || displayName != (profile.display_name ?? "") }
-  private var displayNameValid: Bool { displayName.trimmingCharacters(in: .whitespaces).isEmpty || LibraryUtil.isValidDisplayName(displayName) }
+  private var dirty: Bool {
+    fullName != (profile.full_name ?? "") || displayName != (profile.display_name ?? "")
+  }
+
+  private var displayNameValid: Bool {
+    displayName.trimmingCharacters(in: .whitespaces).isEmpty || LibraryUtil
+      .isValidDisplayName(displayName)
+  }
 
   var body: some View {
     SettingsSection(title: "Identity") {
@@ -126,14 +143,16 @@ struct IdentitySection: View {
         .frame(width: 64, height: 64).clipShape(Circle())
         .overlay(Circle().strokeBorder(VZ.hair, lineWidth: 1))
         VStack(alignment: .leading, spacing: 4) {
-          PhotosPicker(selection: $avatarPick, matching: .images) { Text("Change avatar") }.buttonStyle(.secondaryInline)
+          PhotosPicker(selection: $avatarPick, matching: .images) { Text("Change avatar") }
+            .buttonStyle(.secondaryInline)
           FieldStatus(status: avatarStatus)
         }
       }
       .onChange(of: avatarPick) { _, item in
         guard let item else { return }
         settingWrite($avatarStatus) {
-          guard let data = try await item.loadTransferable(type: Data.self), let png = ImageProcessing.avatarPNG(data) else {
+          guard let data = try await item.loadTransferable(type: Data.self),
+                let png = ImageProcessing.avatarPNG(data) else {
             throw ProfileRepository.Failure.message("Couldn't read that image.")
           }
           _ = try await env.profiles?.uploadAvatar(png: png)
@@ -143,15 +162,27 @@ struct IdentitySection: View {
       }
       TextField("Full name", text: $fullName).textContentType(.name).vzInputFont().vzField()
       VStack(alignment: .leading, spacing: 4) {
-        TextField("Display name", text: $displayName).textInputAutocapitalization(.never).autocorrectionDisabled().vzInputFont().vzField()
-        Text(LibraryUtil.displayNameRule).font(.vzBody(11)).foregroundStyle(!displayNameValid ? VZ.flare : VZ.muted)
+        TextField("Display name", text: $displayName).textInputAutocapitalization(.never)
+          .autocorrectionDisabled().vzInputFont().vzField()
+        Text(LibraryUtil.displayNameRule).font(.vzBody(11))
+          .foregroundStyle(!displayNameValid ? VZ.flare : VZ.muted)
       }
       HStack {
         Button("Save") {
-          settingWrite($status, rollback: { fullName = profile.full_name ?? ""; displayName = profile.display_name ?? "" }) {
-            try await env.profiles?.update(ProfileRepository.ProfilePatch(fullName: .some(fullName), displayName: .some(displayName)))
-            await env.refreshAccount()
-          }
+          settingWrite(
+            $status,
+            rollback: {
+              fullName = profile.full_name ?? ""
+              displayName = profile.display_name ?? ""
+            },
+            work: {
+              try await env.profiles?.update(ProfileRepository.ProfilePatch(
+                fullName: .some(fullName),
+                displayName: .some(displayName)
+              ))
+              await env.refreshAccount()
+            }
+          )
         }
         .buttonStyle(.laserInline).disabled(!dirty || !displayNameValid)
         FieldStatus(status: status)
@@ -184,7 +215,8 @@ struct AccountSection: View {
         Button("Change") { showEmail = true }.buttonStyle(.secondaryInline)
       }
       if let pending = env.session?.newEmail {
-        Text("Confirm the link we sent to \(pending) to finish changing your email.").font(.vzBody(12)).foregroundStyle(VZ.amberInk)
+        Text("Confirm the link we sent to \(pending) to finish changing your email.")
+          .font(.vzBody(12)).foregroundStyle(VZ.amberInk)
       }
       FieldStatus(status: emailStatus)
       Rectangle().fill(VZ.hair).frame(height: 1)
@@ -194,21 +226,31 @@ struct AccountSection: View {
         }
       }
       Rectangle().fill(VZ.hair).frame(height: 1)
-      SettingsRow(label: "Password", detail: profile.password_set == true ? "Set" : "Not set — magic link only") {
-        Button(profile.password_set == true ? "Change" : "Set") { showPassword = true }.buttonStyle(.secondaryInline)
+      SettingsRow(
+        label: "Password",
+        detail: profile.password_set == true ? "Set" : "Not set — magic link only"
+      ) {
+        Button(profile.password_set == true ? "Change" : "Set") { showPassword = true }
+          .buttonStyle(.secondaryInline)
       }
       FieldStatus(status: passwordStatus)
       Rectangle().fill(VZ.hair).frame(height: 1)
       Button("Sign out") { confirmSignOut = true }.buttonStyle(.secondary)
     }
-    .confirmationDialog("Sign out of VIZION?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+    .confirmationDialog(
+      "Sign out of VIZION?",
+      isPresented: $confirmSignOut,
+      titleVisibility: .visible
+    ) {
       Button("Sign out", role: .destructive) { Task { await env.signOut() } }
     }
     .sheet(isPresented: $showEmail) {
       VStack(alignment: .leading, spacing: 12) {
         Text("Change email").font(.vzDisplay(26)).foregroundStyle(VZ.text)
-        Text("We'll send a confirmation to the new address; the change applies once you open it.").font(.vzBody(13)).foregroundStyle(VZ.muted)
-        TextField("New email", text: $newEmail).keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled().vzInputFont().vzField()
+        Text("We'll send a confirmation to the new address; the change applies once you open it.")
+          .font(.vzBody(13)).foregroundStyle(VZ.muted)
+        TextField("New email", text: $newEmail).keyboardType(.emailAddress)
+          .textInputAutocapitalization(.never).autocorrectionDisabled().vzInputFont().vzField()
         Button("Send confirmation") {
           let value = newEmail.trimmingCharacters(in: .whitespaces)
           showEmail = false
@@ -225,9 +267,12 @@ struct AccountSection: View {
     }
     .sheet(isPresented: $showPassword) {
       VStack(alignment: .leading, spacing: 12) {
-        Text(profile.password_set == true ? "Change password" : "Set a password").font(.vzDisplay(26)).foregroundStyle(VZ.text)
-        SecureField("New password", text: $password).textContentType(.newPassword).vzInputFont().vzField()
-        SecureField("Confirm password", text: $confirm).textContentType(.newPassword).vzInputFont().vzField()
+        Text(profile.password_set == true ? "Change password" : "Set a password")
+          .font(.vzDisplay(26)).foregroundStyle(VZ.text)
+        SecureField("New password", text: $password).textContentType(.newPassword).vzInputFont()
+          .vzField()
+        SecureField("Confirm password", text: $confirm).textContentType(.newPassword).vzInputFont()
+          .vzField()
         Text(PasswordRule.text).font(.vzBody(11)).foregroundStyle(VZ.muted)
         Button("Save password") {
           if let weak = PasswordRule.validate(password) {
@@ -269,10 +314,20 @@ struct DefaultsSection: View {
 
   var body: some View {
     SettingsSection(title: "Defaults") {
-      SettingsRow(label: "Default model", detail: isAuto ? "No default — each session starts on Auto" : picked.label) {
+      SettingsRow(
+        label: "Default model",
+        detail: isAuto ? "No default — each session starts on Auto" : picked.label
+      ) {
         Button { showPicker = true } label: {
           HStack(spacing: 6) {
-            if isAuto { IconView(.sparkle, size: 14) } else { DeveloperIcon(developer: picked.developer, size: 14) }
+            if isAuto {
+              IconView(.sparkle, size: 14)
+            } else {
+              DeveloperIcon(
+                developer: picked.developer,
+                size: 14
+              )
+            }
             Text(isAuto ? "Auto" : picked.label)
             IconView(.chevronDown, size: 12)
           }
@@ -286,7 +341,11 @@ struct DefaultsSection: View {
       isAuto = profile.defaultTarget == nil
     }
     .sheet(isPresented: $showPicker, onDismiss: commit) {
-      TargetPickerSheet(selection: $picked, auto: $isAuto, autoDescription: "No default — each session starts on Auto.")
+      TargetPickerSheet(
+        selection: $picked,
+        auto: $isAuto,
+        autoDescription: "No default — each session starts on Auto."
+      )
     }
   }
 
@@ -304,15 +363,19 @@ struct DefaultsSection: View {
     } else {
       ui.autoTarget = true
     }
-    settingWrite($status, rollback: {
-      ui.autoTarget = prevAuto
-      ui.targetModel = prevTarget
-      picked = profile.defaultTarget ?? prevTarget
-      isAuto = profile.defaultTarget == nil
-    }) {
-      try await env.profiles?.update(ProfileRepository.ProfilePatch(defaultModel: .some(next)))
-      await env.refreshAccount()
-    }
+    settingWrite(
+      $status,
+      rollback: {
+        ui.autoTarget = prevAuto
+        ui.targetModel = prevTarget
+        picked = profile.defaultTarget ?? prevTarget
+        isAuto = profile.defaultTarget == nil
+      },
+      work: {
+        try await env.profiles?.update(ProfileRepository.ProfilePatch(defaultModel: .some(next)))
+        await env.refreshAccount()
+      }
+    )
   }
 }
 
@@ -329,12 +392,23 @@ struct AppearanceSection: View {
       SettingsRow(label: "Theme", detail: nil) {
         VZSegmented(
           options: AppTheme.allCases.map { (id: $0, label: $0.label) },
-          selection: Binding(get: { Optional(ui.theme) }, set: { if let theme = $0 { setTheme(theme) } }),
-          accessibilityLabel: "Theme")
+          selection: Binding(
+            get: { Optional(ui.theme) },
+            set: {
+              if let theme = $0 {
+                setTheme(theme)
+              }
+            }
+          ),
+          accessibilityLabel: "Theme"
+        )
       }
       FieldStatus(status: status)
       Rectangle().fill(VZ.hair).frame(height: 1)
-      SettingsRow(label: "Reduced effects", detail: "Turns off the ambient blooms on this device.") {
+      SettingsRow(
+        label: "Reduced effects",
+        detail: "Turns off the ambient blooms on this device."
+      ) {
         Toggle("", isOn: $ui.reducedEffects).labelsHidden().tint(VZ.accent)
       }
     }
@@ -343,9 +417,11 @@ struct AppearanceSection: View {
   private func setTheme(_ theme: AppTheme) {
     let prev = env.ui.theme
     env.ui.theme = theme
-    settingWrite($status, rollback: { env.ui.theme = prev }) {
-      try await env.profiles?.update(ProfileRepository.ProfilePatch(theme: theme))
-    }
+    settingWrite(
+      $status,
+      rollback: { env.ui.theme = prev },
+      work: { try await env.profiles?.update(ProfileRepository.ProfilePatch(theme: theme)) }
+    )
   }
 }
 
@@ -360,39 +436,68 @@ struct DataPrivacySection: View {
   @State private var deleteText = ""
   @State private var deleteStatus: FieldStatus.Status = .idle
 
-  private var usedBytes: Int { media.reduce(0) { $0 + $1.size_bytes } }
+  private var usedBytes: Int {
+    media.reduce(0) { $0 + $1.size_bytes }
+  }
 
   var body: some View {
     SettingsSection(title: "Data & privacy") {
-      SettingsRow(label: "Draft on this device", detail: "The composer draft is cached locally for convenience.") {
+      SettingsRow(
+        label: "Draft on this device",
+        detail: "The composer draft is cached locally for convenience."
+      ) {
         Button("Clear draft") {
           let prior = env.ui.editorDraft
           env.ui.editorDraft = ""
-          env.toasts.show("Draft cleared on this device", actionLabel: "Undo") { env.ui.editorDraft = prior }
+          env.toasts
+            .show("Draft cleared on this device", actionLabel: "Undo") { env.ui.editorDraft = prior
+            }
         }
-        .buttonStyle(.secondaryInline).disabled(env.ui.editorDraft.trimmingCharacters(in: .whitespaces).isEmpty)
+        .buttonStyle(.secondaryInline)
+        .disabled(env.ui.editorDraft.trimmingCharacters(in: .whitespaces).isEmpty)
       }
       Rectangle().fill(VZ.hair).frame(height: 1)
       VStack(alignment: .leading, spacing: 8) {
         let budget = MediaBudget.status(usedBytes: usedBytes)
-        SettingsRow(label: "Stored media", detail: "\(MediaBudget.formatBytes(usedBytes)) of \(MediaBudget.formatBytes(budget.quotaBytes))") {
-          Button { Task { await loadMedia() } } label: { IconView(.refresh, size: 16) }.buttonStyle(.quiet)
+        SettingsRow(
+          label: "Stored media",
+          detail: "\(MediaBudget.formatBytes(usedBytes)) of \(MediaBudget.formatBytes(budget.quotaBytes))"
+        ) {
+          Button { Task { await loadMedia() } } label: { IconView(.refresh, size: 16) }
+            .buttonStyle(.quiet)
         }
         ProgressView(value: min(budget.fraction, 1)).tint(budget.warn ? VZ.amber : VZ.accent)
         ForEach(media) { asset in
           HStack(spacing: 8) {
-            Text(asset.original_name ?? asset.storage_path).font(.vzBody(12)).foregroundStyle(VZ.text).lineLimit(1)
-            Text(MediaBudget.formatBytes(asset.size_bytes)).font(.vzBody(11)).foregroundStyle(VZ.muted)
-            if asset.status != "ready" { Text(asset.status).font(.vzBody(11)).foregroundStyle(VZ.amberInk) }
+            Text(asset.original_name ?? asset.storage_path).font(.vzBody(12))
+              .foregroundStyle(VZ.text).lineLimit(1)
+            Text(MediaBudget.formatBytes(asset.size_bytes)).font(.vzBody(11))
+              .foregroundStyle(VZ.muted)
+            if asset
+              .status !=
+              "ready" {
+              Text(asset.status).font(.vzBody(11)).foregroundStyle(VZ.amberInk)
+            }
             Spacer()
-            Button { Task { await delete(asset) } } label: { IconView(.trash, size: 14) }.buttonStyle(.quiet).accessibilityLabel("Remove")
+            Button { Task { await delete(asset) } } label: { IconView(.trash, size: 14) }
+              .buttonStyle(.quiet).accessibilityLabel("Remove")
           }
         }
       }
-      Text("Prompts and their versions stay until you delete them. Attached media stays in your private storage (50 MB) until you remove it here or in the composer tray — or attach with \"Analyze without keeping\" and nothing is stored. Usage records are kept for cost-cap accounting.")
-        .font(.vzBody(11)).foregroundStyle(VZ.muted)
+      Text(
+        """
+        Prompts and their versions stay until you delete them. Attached media stays in your \
+        private storage (50 MB) until you remove it here or in the composer tray — or attach \
+        with "Analyze without keeping" and nothing is stored. Usage records are kept for \
+        cost-cap accounting.
+        """
+      )
+      .font(.vzBody(11)).foregroundStyle(VZ.muted)
       Rectangle().fill(VZ.hair).frame(height: 1)
-      SettingsRow(label: "Export my data", detail: "Profile, prompts, versions, and media metadata as JSON.") {
+      SettingsRow(
+        label: "Export my data",
+        detail: "Profile, prompts, versions, and media metadata as JSON."
+      ) {
         if let exportURL {
           ShareLink(item: exportURL) { Text("Share") }.buttonStyle(.secondaryInline)
         } else {
@@ -409,7 +514,13 @@ struct DataPrivacySection: View {
       }
       FieldStatus(status: exportStatus)
       Rectangle().fill(VZ.hair).frame(height: 1)
-      SettingsRow(label: "Delete account", detail: "Permanently deletes your sign-in, profile, prompts and all their versions, and stored media. This cannot be undone.") {
+      SettingsRow(
+        label: "Delete account",
+        detail: """
+        Permanently deletes your sign-in, profile, prompts and all their versions, and stored \
+        media. This cannot be undone.
+        """
+      ) {
         Button("Delete…") { confirmDelete = true }.buttonStyle(.destructive)
       }
       FieldStatus(status: deleteStatus)
@@ -431,7 +542,7 @@ struct DataPrivacySection: View {
   }
 
   private func loadMedia() async {
-    media = (try? await env.profiles?.mediaAssets()) ?? []
+    media = await (try? env.profiles?.mediaAssets()) ?? []
   }
 
   private func delete(_ asset: MediaAssetRow) async {
@@ -455,25 +566,41 @@ struct OwnerSection: View {
 
   var body: some View {
     SettingsSection(title: "Owner") {
-      SettingsRow(label: "Open access", detail: openAccess ? "Anyone can register and use the app." : "Only you can use the app.") {
+      SettingsRow(
+        label: "Open access",
+        detail: openAccess ? "Anyone can register and use the app." : "Only you can use the app."
+      ) {
         Toggle("", isOn: $openAccess).labelsHidden().tint(VZ.accent)
           .onChange(of: openAccess) { old, new in
-            settingWrite($status, rollback: { openAccess = old }) {
-              try await env.profiles?.updateAppSettings(openAccess: new)
-              await env.refreshAccount()
-            }
+            settingWrite(
+              $status,
+              rollback: { openAccess = old },
+              work: {
+                try await env.profiles?.updateAppSettings(openAccess: new)
+                await env.refreshAccount()
+              }
+            )
           }
       }
       Rectangle().fill(VZ.hair).frame(height: 1)
       VStack(alignment: .leading, spacing: 6) {
-        SettingsRow(label: "Developer accent strength", detail: "Library-card corner field, \(Int(strength))%") { EmptyView() }
+        SettingsRow(
+          label: "Developer accent strength",
+          detail: "Library-card corner field, \(Int(strength))%"
+        ) { EmptyView() }
         Slider(
           value: $strength,
-          in: Double(AppSettings.devAccentRange.lowerBound)...Double(AppSettings.devAccentRange.upperBound),
+          in: Double(AppSettings.devAccentRange.lowerBound) ...
+            Double(AppSettings.devAccentRange.upperBound),
           step: 1,
           onEditingChanged: { editing in
-            if !editing { settingWrite($status) { try await env.profiles?.updateAppSettings(devAccentStrength: Int(strength)) } }
-          })
+            if !editing {
+              settingWrite($status) {
+                try await env.profiles?.updateAppSettings(devAccentStrength: Int(strength))
+              }
+            }
+          }
+        )
         .tint(VZ.accent)
       }
       FieldStatus(status: status)
@@ -491,7 +618,8 @@ struct AboutSection: View {
   var body: some View {
     SettingsSection(title: "About") {
       SettingsRow(label: "Version", detail: nil) {
-        Text("v\(AppVersion.marketing) (\(AppVersion.build))").font(.vzBody(13)).monospacedDigit().foregroundStyle(VZ.muted)
+        Text("v\(AppVersion.marketing) (\(AppVersion.build))").font(.vzBody(13)).monospacedDigit()
+          .foregroundStyle(VZ.muted)
       }
       Rectangle().fill(VZ.hair).frame(height: 1)
       VStack(alignment: .leading, spacing: 4) {
@@ -499,8 +627,13 @@ struct AboutSection: View {
         Text(VizionBrand.acknowledgements).font(.vzBody(11)).foregroundStyle(VZ.muted)
       }
       Rectangle().fill(VZ.hair).frame(height: 1)
-      Text("VIZION is a VASEY/AI product. License and security policy live in the repository (LICENSE · SECURITY.md).")
-        .font(.vzBody(11)).foregroundStyle(VZ.muted)
+      Text(
+        """
+        VIZION is a VASEY/AI product. \
+        License and security policy live in the repository (LICENSE · SECURITY.md).
+        """
+      )
+      .font(.vzBody(11)).foregroundStyle(VZ.muted)
     }
   }
 }

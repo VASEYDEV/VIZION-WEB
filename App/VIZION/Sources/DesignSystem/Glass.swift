@@ -15,7 +15,8 @@ struct GlassPanel: ViewModifier {
       .background { GlassBackground(shape: shape, solid: solid) }
       .overlay { shape.strokeBorder(VZ.hair, lineWidth: 1) }
       .overlay(alignment: .top) {
-        Rectangle().fill(VZ.sheen).frame(height: 1).padding(.horizontal, cornerRadius / 2).blendMode(.plusLighter)
+        Rectangle().fill(VZ.sheen).frame(height: 1).padding(.horizontal, cornerRadius / 2)
+          .blendMode(.plusLighter)
       }
       .clipShape(shape)
   }
@@ -60,7 +61,8 @@ extension View {
   func vzScrim(cornerRadius: CGFloat = VZ.Radius.control) -> some View {
     background(
       RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        .fill(VZ.ground.opacity(0.6)))
+        .fill(VZ.ground.opacity(0.6))
+    )
   }
 
   /// Glass input field styling (the sign-in fields, the composer editor).

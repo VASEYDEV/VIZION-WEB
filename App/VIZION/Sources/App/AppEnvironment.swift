@@ -36,6 +36,9 @@ final class AppEnvironment {
   var pendingDraft: String?
   var pendingPromptID: String?
   var pendingAuthError: String?
+  /// A tab the app should switch to (deep link, draft resume, New prompt);
+  /// consumed by `MainTabView`, including a value set before it existed.
+  var pendingTab: AppTab?
 
   private var observing = false
 
@@ -45,7 +48,10 @@ final class AppEnvironment {
       self.config = config
       let supabase = SupabaseService(config: config)
       self.supabase = supabase
-      api = VizionAPI(baseURL: config.apiBaseURL, tokenProvider: { try await supabase.accessToken() })
+      api = VizionAPI(
+        baseURL: config.apiBaseURL,
+        tokenProvider: { try await supabase.accessToken() }
+      )
       library = LibraryRepository(client: supabase.client)
       profiles = ProfileRepository(client: supabase.client)
     case let .failure(problem):
@@ -54,17 +60,27 @@ final class AppEnvironment {
   }
 
   var gate: Gate {
-    if let configProblem { return .configMissing(configProblem) }
+    if let configProblem {
+      return .configMissing(configProblem)
+    }
     guard sessionResolved else { return .loading }
     guard let session else { return .signedOut }
-    if let profile, profile.needsPasswordOnboarding { return .needsPassword }
-    if !appSettings.open_access, !isOwner(session.userID) { return .closed }
+    if let profile, profile.needsPasswordOnboarding {
+      return .needsPassword
+    }
+    if !appSettings.open_access, !isOwner(session.userID) {
+      return .closed
+    }
     return .app
   }
 
-  var isOwner: Bool { session.map { isOwner($0.userID) } ?? false }
+  var isOwner: Bool {
+    session.map { isOwner($0.userID) } ?? false
+  }
 
-  private func isOwner(_ userID: String) -> Bool { appSettings.isOwner(userID: userID) }
+  private func isOwner(_ userID: String) -> Bool {
+    appSettings.isOwner(userID: userID)
+  }
 
   // MARK: Lifecycle
 
@@ -72,14 +88,18 @@ final class AppEnvironment {
     guard let supabase, !observing else { return }
     observing = true
     session = supabase.currentSession
-    if session != nil { await refreshAccount() }
+    if session != nil {
+      await refreshAccount()
+    }
     sessionResolved = true
     for await change in supabase.authChanges {
       switch change.event {
       case .signedIn, .tokenRefreshed, .userUpdated, .initialSession:
         let had = session != nil
         session = supabase.currentSession
-        if session != nil, !had || change.event == .userUpdated { await refreshAccount() }
+        if session != nil, !had || change.event == .userUpdated {
+          await refreshAccount()
+        }
       case .signedOut:
         session = nil
         profile = nil
@@ -122,10 +142,14 @@ final class AppEnvironment {
     switch link {
     case let .enhance(draft):
       pendingDraft = draft
+      pendingTab = .enhance
     case let .prompt(id):
       pendingPromptID = id
-    case .library, .settings:
-      break
+      pendingTab = .library
+    case .library:
+      pendingTab = .library
+    case .settings:
+      pendingTab = .settings
     case let .authCallback(callback):
       do {
         try await supabase?.completeSignIn(from: callback)

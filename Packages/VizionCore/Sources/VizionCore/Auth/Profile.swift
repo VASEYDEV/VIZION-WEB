@@ -5,7 +5,9 @@ public enum AppTheme: String, CaseIterable, Codable, Sendable, Identifiable, Has
   case light
   case system
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public var label: String {
     switch self {
@@ -50,7 +52,10 @@ public struct Profile: Codable, Sendable, Hashable {
     self.updated_at = updated_at
   }
 
-  public var defaultTarget: TargetModel? { TargetModel.resolve(default_model) }
+  public var defaultTarget: TargetModel? {
+    TargetModel.resolve(default_model)
+  }
+
   public var needsPasswordOnboarding: Bool {
     Onboarding.needsPassword(authMethod: auth_method, passwordSet: password_set ?? false)
   }
@@ -62,7 +67,11 @@ public struct AppSettings: Codable, Sendable, Hashable {
   public var open_access: Bool
   public var dev_accent_strength: Int
 
-  public init(owner_user_id: String? = nil, open_access: Bool = true, dev_accent_strength: Int = 26) {
+  public init(
+    owner_user_id: String? = nil,
+    open_access: Bool = true,
+    dev_accent_strength: Int = 26
+  ) {
     self.owner_user_id = owner_user_id
     self.open_access = open_access
     self.dev_accent_strength = dev_accent_strength
@@ -72,7 +81,7 @@ public struct AppSettings: Codable, Sendable, Hashable {
   /// everyone out.
   public static let defaults = AppSettings()
 
-  public static let devAccentRange = 0...60
+  public static let devAccentRange = 0 ... 60
 
   /// The recorded claimant is the owner. (The web also honours OWNER_EMAIL,
   /// which is server-side env — a native client cannot see it, so before the

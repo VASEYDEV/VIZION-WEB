@@ -11,7 +11,9 @@ public enum LibraryView: String, CaseIterable, Codable, Sendable, Identifiable {
   /// filter badge and back button all keep working through it.
   case drafts
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public var label: String {
     switch self {
@@ -29,7 +31,9 @@ public enum LibrarySort: String, CaseIterable, Codable, Sendable, Identifiable {
   case created
   case title
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public var label: String {
     switch self {
@@ -47,7 +51,9 @@ public enum LibrarySort: String, CaseIterable, Codable, Sendable, Identifiable {
     }
   }
 
-  public var ascending: Bool { self == .title }
+  public var ascending: Bool {
+    self == .title
+  }
 }
 
 public struct LibraryFilter: Sendable, Hashable, Codable {
@@ -65,10 +71,12 @@ public struct LibraryFilter: Sendable, Hashable, Codable {
     q: String? = nil, model: TargetModel? = nil, mode: EnhanceMode? = nil, tag: String? = nil,
     collection: String? = nil, view: LibraryView = .all, sort: LibrarySort = .updated
   ) {
-    self.q = q?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty.map { String($0.prefix(200)) }
+    self.q = q?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+      .map { String($0.prefix(200)) }
     self.model = model
     self.mode = mode
-    self.tag = tag?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty.map { String($0.prefix(60)) }
+    self.tag = tag?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+      .map { String($0.prefix(60)) }
     self.collection = collection.flatMap { LibraryPaging.isUUID($0) ? $0 : nil }
     self.view = view
     self.sort = sort
@@ -76,33 +84,63 @@ public struct LibraryFilter: Sendable, Hashable, Codable {
 
   public static let `default` = LibraryFilter()
 
-  public var isDraftsView: Bool { view == .drafts }
+  public var isDraftsView: Bool {
+    view == .drafts
+  }
 
   /// Count of narrowing selections — the filter button's badge. Search is
   /// excluded (it's visible in the field itself).
   public var activeCount: Int {
     var n = 0
-    if model != nil { n += 1 }
-    if mode != nil { n += 1 }
-    if tag != nil { n += 1 }
-    if collection != nil { n += 1 }
-    if view != .all { n += 1 }
-    if sort != .updated { n += 1 }
+    if model != nil {
+      n += 1
+    }
+    if mode != nil {
+      n += 1
+    }
+    if tag != nil {
+      n += 1
+    }
+    if collection != nil {
+      n += 1
+    }
+    if view != .all {
+      n += 1
+    }
+    if sort != .updated {
+      n += 1
+    }
     return n
   }
 
-  public var isDefault: Bool { activeCount == 0 && q == nil }
+  public var isDefault: Bool {
+    activeCount == 0 && q == nil
+  }
 
   /// The web URL for this filter (defaults omitted) — used for Share/hand-off.
   public func webPath() -> String {
     var params: [(String, String)] = []
-    if let q { params.append(("q", q)) }
-    if let model { params.append(("model", model.rawValue)) }
-    if let mode { params.append(("mode", mode.rawValue)) }
-    if let tag { params.append(("tag", tag)) }
-    if let collection { params.append(("collection", collection)) }
-    if view != .all { params.append(("view", view.rawValue)) }
-    if sort != .updated { params.append(("sort", sort.rawValue)) }
+    if let q {
+      params.append(("q", q))
+    }
+    if let model {
+      params.append(("model", model.rawValue))
+    }
+    if let mode {
+      params.append(("mode", mode.rawValue))
+    }
+    if let tag {
+      params.append(("tag", tag))
+    }
+    if let collection {
+      params.append(("collection", collection))
+    }
+    if view != .all {
+      params.append(("view", view.rawValue))
+    }
+    if sort != .updated {
+      params.append(("sort", sort.rawValue))
+    }
     guard !params.isEmpty else { return "/library" }
     var components = URLComponents()
     components.queryItems = params.map { URLQueryItem(name: $0.0, value: $0.1) }
@@ -118,7 +156,9 @@ public enum LibraryPaging {
   public static func escapeLike(_ s: String) -> String {
     var out = ""
     for ch in s {
-      if ch == "\\" || ch == "%" || ch == "_" { out.append("\\") }
+      if ch == "\\" || ch == "%" || ch == "_" {
+        out.append("\\")
+      }
       out.append(ch)
     }
     return out
@@ -139,7 +179,8 @@ public enum LibraryPaging {
   /// nil for a tampered/garbled cursor → fresh first page. The id half is
   /// pinned to a UUID because both halves are interpolated into filter grammar.
   public static func decodeCursor(_ raw: String) -> (value: String, id: String)? {
-    guard let sep = raw.range(of: cursorSeparator), sep.lowerBound != raw.startIndex else { return nil }
+    guard let sep = raw.range(of: cursorSeparator),
+          sep.lowerBound != raw.startIndex else { return nil }
     let value = String(raw[..<sep.lowerBound])
     let id = String(raw[sep.upperBound...])
     guard !id.isEmpty, isUUID(id) else { return nil }
@@ -147,7 +188,10 @@ public enum LibraryPaging {
   }
 
   /// The PostgREST `.or()` expression for the next page after a cursor.
-  public static func cursorExpression(sort: LibrarySort, cursor: (value: String, id: String)) -> String {
+  public static func cursorExpression(
+    sort: LibrarySort,
+    cursor: (value: String, id: String)
+  ) -> String {
     let op = sort.ascending ? "gt" : "lt"
     let v = quoteOrValue(cursor.value)
     return "\(sort.column).\(op).\(v),and(\(sort.column).eq.\(v),id.lt.\(cursor.id))"
@@ -177,5 +221,7 @@ public enum LibraryPaging {
 }
 
 extension String {
-  var nilIfEmpty: String? { isEmpty ? nil : self }
+  var nilIfEmpty: String? {
+    isEmpty ? nil : self
+  }
 }

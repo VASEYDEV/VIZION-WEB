@@ -10,7 +10,9 @@ public enum ThinkingLevel: String, CaseIterable, Codable, Sendable, Identifiable
   case xhigh
   case max
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public var label: String {
     switch self {
@@ -77,7 +79,9 @@ public enum AutoPreference: String, CaseIterable, Codable, Sendable, Identifiabl
   case balanced
   case budget
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   public var label: String {
     switch self {

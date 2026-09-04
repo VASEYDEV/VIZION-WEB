@@ -9,6 +9,8 @@ excluded:
 disabled_rules:
   - trailing_comma
   - todo
+  # Cursor/geometry helpers return small labeled tuples deliberately.
+  - large_tuple
 opt_in_rules:
   - empty_count
   - closure_spacing
@@ -22,9 +24,16 @@ line_length:
   error: 140
   ignores_comments: true
   ignores_urls: true
+  # Multi-line literals are user-facing copy, not code.
+  ignores_multiline_strings: true
 identifier_name:
   min_length: 1
-  excluded: [id, x, y, i, j, n, m, a, b, rx, ry, cx, cy, dx, dy]
+  # Codable rows keep the Postgres column names (snake_case) so the wire
+  # shape is visible at the declaration and never re-mapped by hand.
+  allowed_symbols: ["_"]
+  excluded: [id, x, y, i, j, n, m, a, b, rx, ry, cx, cy, dx, dy, hh]
+type_name:
+  min_length: 2
 type_body_length:
   warning: 400
   error: 600

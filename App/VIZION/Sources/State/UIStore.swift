@@ -12,22 +12,63 @@ final class UIStore {
 
   /// The account this state belongs to; a mismatch on hydrate drops the
   /// previous user's draft on a shared device.
-  var userID: String? { didSet { scheduleSave() } }
-  var theme: AppTheme = .system { didSet { scheduleSave() } }
-  var activeMode: EnhanceMode = .default { didSet { scheduleSave() } }
-  var targetModel: TargetModel = .default { didSet { scheduleSave() } }
+  var userID: String? {
+    didSet { scheduleSave() }
+  }
+
+  var theme: AppTheme = .system {
+    didSet { scheduleSave() }
+  }
+
+  var activeMode: EnhanceMode = .default {
+    didSet { scheduleSave() }
+  }
+
+  var targetModel: TargetModel = .default {
+    didSet { scheduleSave() }
+  }
+
   /// Chosen reasoning depth PER TARGET. No entry = "Auto" = provider default.
-  var thinkingLevels: [TargetModel: ThinkingLevel] = [:] { didSet { scheduleSave() } }
-  var editorDraft = "" { didSet { scheduleSave() } }
-  var mediaNoticeAcknowledged = false { didSet { scheduleSave() } }
-  var mediaStoreByDefault = true { didSet { scheduleSave() } }
-  var reducedEffects = false { didSet { scheduleSave() } }
+  var thinkingLevels: [TargetModel: ThinkingLevel] = [:] {
+    didSet { scheduleSave() }
+  }
+
+  var editorDraft = "" {
+    didSet { scheduleSave() }
+  }
+
+  var mediaNoticeAcknowledged = false {
+    didSet { scheduleSave() }
+  }
+
+  var mediaStoreByDefault = true {
+    didSet { scheduleSave() }
+  }
+
+  var reducedEffects = false {
+    didSet { scheduleSave() }
+  }
+
   /// Let the server pick the model per run; `targetModel` stays as the fallback.
-  var autoTarget = false { didSet { scheduleSave() } }
-  var autoPreference: AutoPreference = .default { didSet { scheduleSave() } }
-  var dialTipSeen = false { didSet { scheduleSave() } }
-  var reformatFormat: OutputFormat? { didSet { scheduleSave() } }
-  var lengthByMode: [EnhanceMode: LengthSetting] = [:] { didSet { scheduleSave() } }
+  var autoTarget = false {
+    didSet { scheduleSave() }
+  }
+
+  var autoPreference: AutoPreference = .default {
+    didSet { scheduleSave() }
+  }
+
+  var dialTipSeen = false {
+    didSet { scheduleSave() }
+  }
+
+  var reformatFormat: OutputFormat? {
+    didSet { scheduleSave() }
+  }
+
+  var lengthByMode: [EnhanceMode: LengthSetting] = [:] {
+    didSet { scheduleSave() }
+  }
 
   private let defaults: UserDefaults
   private var saveTask: Task<Void, Never>?
@@ -43,18 +84,27 @@ final class UIStore {
 
   var thinkingLevel: ThinkingLevel? {
     get {
-      guard let level = thinkingLevels[targetModel], targetModel.thinkingLadder.contains(level) else { return nil }
+      guard let level = thinkingLevels[targetModel],
+            targetModel.thinkingLadder.contains(level) else { return nil }
       return level
     }
     set {
-      if let newValue { thinkingLevels[targetModel] = newValue } else { thinkingLevels.removeValue(forKey: targetModel) }
+      if let newValue {
+        thinkingLevels[targetModel] = newValue
+      } else {
+        thinkingLevels.removeValue(forKey: targetModel)
+      }
     }
   }
 
   var lengthForActiveMode: LengthSetting? {
     get { activeMode.hasLengthControl ? lengthByMode[activeMode] : nil }
     set {
-      if let newValue { lengthByMode[activeMode] = newValue } else { lengthByMode.removeValue(forKey: activeMode) }
+      if let newValue {
+        lengthByMode[activeMode] = newValue
+      } else {
+        lengthByMode.removeValue(forKey: activeMode)
+      }
     }
   }
 
@@ -67,7 +117,9 @@ final class UIStore {
       thinkingLevels = [:]
     }
     self.userID = userID
-    if let theme = profile?.theme { self.theme = theme }
+    if let theme = profile?.theme {
+      self.theme = theme
+    }
     if let model = profile?.defaultTarget {
       targetModel = model
       autoTarget = false
@@ -97,7 +149,7 @@ final class UIStore {
 
   private func load() {
     guard let data = defaults.data(forKey: Self.storageKey),
-      let p = try? JSONDecoder().decode(Persisted.self, from: data)
+          let p = try? JSONDecoder().decode(Persisted.self, from: data)
     else { return }
     userID = p.userId
     theme = AppTheme(rawValue: p.theme ?? "") ?? .system
@@ -107,7 +159,7 @@ final class UIStore {
     var levels: [TargetModel: ThinkingLevel] = [:]
     for (key, raw) in p.thinkingLevels ?? [:] {
       guard let target = TargetModel.resolve(key), let level = ThinkingLevel(rawValue: raw),
-        target.thinkingLadder.contains(level)
+            target.thinkingLadder.contains(level)
       else { continue }
       levels[target] = level
     }
@@ -122,7 +174,8 @@ final class UIStore {
     reformatFormat = OutputFormat(rawValue: p.reformatFormat ?? "")
     var lengths: [EnhanceMode: LengthSetting] = [:]
     for (key, raw) in p.lengthByMode ?? [:] {
-      if let mode = EnhanceMode(rawValue: key), mode.hasLengthControl, let length = LengthSetting(rawValue: raw) {
+      if let mode = EnhanceMode(rawValue: key), mode.hasLengthControl,
+         let length = LengthSetting(rawValue: raw) {
         lengths[mode] = length
       }
     }
@@ -131,12 +184,21 @@ final class UIStore {
 
   private func snapshot() -> Persisted {
     Persisted(
-      userId: userID, theme: theme.rawValue, activeMode: activeMode.rawValue, targetModel: targetModel.rawValue,
-      thinkingLevels: Dictionary(uniqueKeysWithValues: thinkingLevels.map { ($0.key.rawValue, $0.value.rawValue) }),
+      userId: userID, theme: theme.rawValue, activeMode: activeMode.rawValue,
+      targetModel: targetModel.rawValue,
+      thinkingLevels: Dictionary(uniqueKeysWithValues: thinkingLevels.map { (
+        $0.key.rawValue,
+        $0.value.rawValue
+      ) }),
       editorDraft: editorDraft, mediaNoticeAcknowledged: mediaNoticeAcknowledged,
-      mediaStoreByDefault: mediaStoreByDefault, reducedEffects: reducedEffects, autoTarget: autoTarget,
-      autoPreference: autoPreference.rawValue, dialTipSeen: dialTipSeen, reformatFormat: reformatFormat?.rawValue,
-      lengthByMode: Dictionary(uniqueKeysWithValues: lengthByMode.map { ($0.key.rawValue, $0.value.rawValue) })
+      mediaStoreByDefault: mediaStoreByDefault, reducedEffects: reducedEffects,
+      autoTarget: autoTarget,
+      autoPreference: autoPreference.rawValue, dialTipSeen: dialTipSeen,
+      reformatFormat: reformatFormat?.rawValue,
+      lengthByMode: Dictionary(uniqueKeysWithValues: lengthByMode.map { (
+        $0.key.rawValue,
+        $0.value.rawValue
+      ) })
     )
   }
 

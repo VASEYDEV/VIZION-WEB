@@ -26,7 +26,8 @@ struct AppConfig: Sendable, Equatable {
 
   static func load(from bundle: Bundle = .main) -> Result<AppConfig, Problem> {
     func value(_ key: String) -> Result<String, Problem> {
-      guard let raw = bundle.object(forInfoDictionaryKey: key) as? String else { return .failure(.missing(key)) }
+      guard let raw = bundle.object(forInfoDictionaryKey: key) as? String
+      else { return .failure(.missing(key)) }
       let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
       // An unfilled template still carries the placeholder text.
       guard !trimmed.isEmpty, !trimmed.contains("YOUR-") else { return .failure(.missing(key)) }

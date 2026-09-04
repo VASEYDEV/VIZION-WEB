@@ -1,5 +1,5 @@
-import XCTest
 @testable import VizionCore
+import XCTest
 
 final class DiffTests: XCTestCase {
   func testTokenizeKeepsWhitespaceRuns() {
@@ -28,7 +28,7 @@ final class DiffTests: XCTestCase {
   }
 
   func testBoundedDiffRefusesOversizedInput() {
-    let big = Array(repeating: "w", count: 2_001).joined(separator: " ")
+    let big = Array(repeating: "w", count: 2001).joined(separator: " ")
     XCTAssertNil(WordDiff.boundedDiffWords(big, "x"))
     XCTAssertNotNil(WordDiff.boundedDiffWords("a b", "a c"))
   }

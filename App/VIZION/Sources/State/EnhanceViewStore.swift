@@ -25,14 +25,19 @@ struct EnhanceView: Codable, Sendable, Hashable {
 
   /// The model that ACTUALLY ran. Under Auto the submitted target is only the
   /// fallback the client sent; the server reports what it resolved to.
-  var effectiveTarget: TargetModel { result.resolvedTarget ?? submitted.target }
+  var effectiveTarget: TargetModel {
+    result.resolvedTarget ?? submitted.target
+  }
 
-  var rejectedSet: Set<Int> { Set(rejected ?? []) }
+  var rejectedSet: Set<Int> {
+    Set(rejected ?? [])
+  }
 
   /// What Copy/Use/Save/Share/export all consume — the output with the
   /// user's per-change decisions applied.
   var effectiveOutput: String {
-    guard submitted.mode == .polish, let diff = result.diff, !rejectedSet.isEmpty else { return result.output }
+    guard submitted.mode == .polish, let diff = result.diff,
+          !rejectedSet.isEmpty else { return result.output }
     return WordDiff.applyDecisions(diff, rejected: rejectedSet)
   }
 }
@@ -57,7 +62,10 @@ final class EnhanceViewStore {
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
-    if let data = defaults.data(forKey: Self.storageKey), let p = try? JSONDecoder().decode(Persisted.self, from: data) {
+    if let data = defaults.data(forKey: Self.storageKey), let p = try? JSONDecoder().decode(
+      Persisted.self,
+      from: data
+    ) {
       // Validated on every rehydrate: a result for a target the roster has
       // since renamed is dropped rather than re-keyed — it is a cache of one run.
       view = p.view

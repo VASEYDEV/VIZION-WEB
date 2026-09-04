@@ -1,6 +1,6 @@
-import XCTest
-import VizionCore
 @testable import VIZION
+import VizionCore
+import XCTest
 
 @MainActor
 final class UIStoreTests: XCTestCase {
@@ -21,12 +21,12 @@ final class UIStoreTests: XCTestCase {
     XCTAssertTrue(store.mediaStoreByDefault)
   }
 
-  func testPersistsAndMigratesLegacyTargetIDs() throws {
+  func testPersistsAndMigratesLegacyTargetIDs() {
     let defaults = freshDefaults()
     let legacy = """
-      {"targetModel":"opus_4_8","thinkingLevels":{"gemini_3_5_thinking":"minimal","opus_4_8":"max","kimi_k2_6":"high"},
-       "activeMode":"target","editorDraft":"hello","lengthByMode":{"expand":"long","polish":"short"}}
-      """
+    {"targetModel":"opus_4_8","thinkingLevels":{"gemini_3_5_thinking":"minimal","opus_4_8":"max","kimi_k2_6":"high"},
+     "activeMode":"target","editorDraft":"hello","lengthByMode":{"expand":"long","polish":"short"}}
+    """
     defaults.set(Data(legacy.utf8), forKey: UIStore.storageKey)
     let store = UIStore(defaults: defaults)
     XCTAssertEqual(store.targetModel, .opus5)
@@ -69,12 +69,16 @@ final class UIStoreTests: XCTestCase {
 final class EnhanceViewStoreTests: XCTestCase {
   func testViewPersistsPerAccountAndIsWipedOnSwitch() throws {
     let suite = "vizion.tests.\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     let store = EnhanceViewStore(defaults: defaults)
     let result = EnhanceResult(
       output: "o", rationale: "r", diff: nil, tokenIn: 1, tokenOut: 1, modelUsed: "m", costUsd: 0,
-      usage: EnhanceResult.Usage(todayCost: 0, capUsd: 2))
-    store.set(EnhanceView(submitted: .init(input: "i", mode: .polish, target: .opus5), result: result), userID: "a")
+      usage: EnhanceResult.Usage(todayCost: 0, capUsd: 2)
+    )
+    store.set(
+      EnhanceView(submitted: .init(input: "i", mode: .polish, target: .opus5), result: result),
+      userID: "a"
+    )
     let reloaded = EnhanceViewStore(defaults: defaults)
     XCTAssertEqual(reloaded.view?.result.output, "o")
     reloaded.adopt(userID: "b")
@@ -84,9 +88,14 @@ final class EnhanceViewStoreTests: XCTestCase {
   func testEffectiveOutputAppliesPolishDecisions() {
     let diff = WordDiff.diffWords("teh cat", "the cat")
     let result = EnhanceResult(
-      output: "the cat", rationale: "", diff: diff, tokenIn: 1, tokenOut: 1, modelUsed: "m", costUsd: 0,
-      usage: EnhanceResult.Usage(todayCost: 0, capUsd: 2))
-    var view = EnhanceView(submitted: .init(input: "teh cat", mode: .polish, target: .opus5), result: result)
+      output: "the cat", rationale: "", diff: diff, tokenIn: 1, tokenOut: 1, modelUsed: "m",
+      costUsd: 0,
+      usage: EnhanceResult.Usage(todayCost: 0, capUsd: 2)
+    )
+    var view = EnhanceView(
+      submitted: .init(input: "teh cat", mode: .polish, target: .opus5),
+      result: result
+    )
     XCTAssertEqual(view.effectiveOutput, "the cat")
     view.rejected = [0]
     XCTAssertEqual(view.effectiveOutput, "teh cat")

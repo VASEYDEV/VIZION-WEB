@@ -14,7 +14,9 @@ public enum EnhanceMode: String, CaseIterable, Codable, Sendable, Identifiable, 
   case reformat
   case target
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   /// The only sanctioned way to render a stored mode (ids and labels diverge).
   public var label: String {

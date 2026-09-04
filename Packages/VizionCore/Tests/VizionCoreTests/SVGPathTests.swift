@@ -1,5 +1,5 @@
-import XCTest
 @testable import VizionCore
+import XCTest
 
 final class SVGPathTests: XCTestCase {
   static let glyph =
@@ -29,19 +29,21 @@ final class SVGPathTests: XCTestCase {
     let commands = try SVGPathParser.parse("M0 0a.5.5 0 01.5.5l-1-1")
     XCTAssertEqual(commands.first, .move(x: 0, y: 0))
     let cubics = commands.compactMap { cmd -> SVGPathCommand? in
-      if case .cubic = cmd { return cmd }
+      if case .cubic = cmd {
+        return cmd
+      }
       return nil
     }
     XCTAssertGreaterThanOrEqual(cubics.count, 1)
     // The arc ends at (0.5, 0.5); the relative line then lands at (-0.5, -0.5).
-    if case let .cubic(_, _, _, _, x, y) = cubics.last! {
+    if case let .cubic(_, _, _, _, x, y) = try XCTUnwrap(cubics.last) {
       XCTAssertEqual(x, 0.5, accuracy: 1e-9)
       XCTAssertEqual(y, 0.5, accuracy: 1e-9)
     }
     XCTAssertEqual(commands.last, .line(x: -0.5, y: -0.5))
     // An implicit arc repeat needs all seven parameters.
     let repeated = try SVGPathParser.parse("M0 0a1 1 0 0 1 1 1 1 1 0 0 1 1 1")
-    XCTAssertEqual(SVGPathParser.bounds(repeated)!.maxX, 2, accuracy: 1e-6)
+    XCTAssertEqual(try XCTUnwrap(SVGPathParser.bounds(repeated)?.maxX), 2, accuracy: 1e-6)
     XCTAssertThrowsError(try SVGPathParser.parse("M0 0a.5.5 0 01.5.5-1-1"))
   }
 
@@ -53,7 +55,7 @@ final class SVGPathTests: XCTestCase {
     guard case let .cubic(_, _, _, _, x, y) = commands[1] else { return XCTFail("cubic expected") }
     XCTAssertEqual(x, 10, accuracy: 1e-6)
     XCTAssertEqual(abs(y), 10, accuracy: 1e-6)
-    let bounds = SVGPathParser.bounds(commands)!
+    let bounds = try XCTUnwrap(SVGPathParser.bounds(commands))
     XCTAssertEqual(bounds.minX, 0, accuracy: 1e-6)
     XCTAssertEqual(bounds.maxX, 20, accuracy: 1e-6)
   }
@@ -62,19 +64,31 @@ final class SVGPathTests: XCTestCase {
     for (developer, mark) in DeveloperMark.paths {
       let commands = try SVGPathParser.parse(mark.d)
       XCTAssertFalse(commands.isEmpty, "\(developer) produced no geometry")
-      let bounds = SVGPathParser.bounds(commands)!
-      XCTAssertLessThanOrEqual(bounds.maxX, mark.viewBoxWidth * 1.05, "\(developer) overflows its viewBox")
-      XCTAssertLessThanOrEqual(bounds.maxY, mark.viewBoxHeight * 1.05, "\(developer) overflows its viewBox")
+      let bounds = try XCTUnwrap(SVGPathParser.bounds(commands))
+      XCTAssertLessThanOrEqual(
+        bounds.maxX,
+        mark.viewBoxWidth * 1.05,
+        "\(developer) overflows its viewBox"
+      )
+      XCTAssertLessThanOrEqual(
+        bounds.maxY,
+        mark.viewBoxHeight * 1.05,
+        "\(developer) overflows its viewBox"
+      )
     }
     XCTAssertEqual(DeveloperMark.paths.count, Developer.allCases.count)
   }
 
-  func testBrandGlyphMatchesTheMaster() throws {
+  func testBrandGlyphMatchesTheSourceArtwork() throws {
     let commands = try SVGPathParser.parse(BrandGlyph.pathData)
-    let bounds = SVGPathParser.bounds(commands)!
+    let bounds = try XCTUnwrap(SVGPathParser.bounds(commands))
     XCTAssertEqual(bounds.minX, 19.8, accuracy: 0.01)
     XCTAssertEqual(bounds.maxY, 873.0, accuracy: 0.01)
-    XCTAssertEqual(commands.filter { $0 == .close }.count, 4, "chevron, bar, and the two ring halves")
+    XCTAssertEqual(
+      commands.filter { $0 == .close }.count,
+      4,
+      "chevron, bar, and the two ring halves"
+    )
   }
 
   func testErrors() {

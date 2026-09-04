@@ -25,23 +25,31 @@ public enum DeepLink: Sendable, Hashable {
 
     // vizion://host/path  vs  https://origin/host/path
     var segments = url.pathComponents.filter { $0 != "/" }
-    if isScheme, let host = url.host { segments.insert(host, at: 0) }
+    if isScheme, let host = url.host {
+      segments.insert(host, at: 0)
+    }
     guard let first = segments.first else { return isScheme ? .enhance(draft: nil) : nil }
 
     let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
-    func param(_ name: String) -> String? { query.first { $0.name == name }?.value }
+    func param(_ name: String) -> String? {
+      query.first { $0.name == name }?.value
+    }
 
     switch first {
     case "enhance":
       return .enhance(draft: param("draft"))
     case "library":
-      if segments.count >= 2, LibraryPaging.isUUID(segments[1]) { return .prompt(id: segments[1]) }
+      if segments.count >= 2, LibraryPaging.isUUID(segments[1]) {
+        return .prompt(id: segments[1])
+      }
       return .library
     case "profile", "settings":
       return .settings
     case "auth":
       guard segments.count >= 2, segments[1] == "callback" else { return nil }
-      if let error = param("error_description") ?? param("error") { return .authError(error) }
+      if let error = param("error_description") ?? param("error") {
+        return .authError(error)
+      }
       return .authCallback(url)
     default:
       return nil
@@ -57,7 +65,7 @@ public enum DeepLink: Sendable, Hashable {
 public enum DraftParam {
   /// Longest prefill accepted. A silently truncated prompt is worse than a
   /// refused one.
-  public static let maxChars = 8_000
+  public static let maxChars = 8000
 
   public enum Outcome: Sendable, Hashable {
     /// Nothing to do — no param, or it was empty/oversized.
@@ -71,7 +79,9 @@ public enum DraftParam {
   public static func resolve(_ param: String?, currentDraft: String) -> Outcome {
     guard let param else { return .none }
     let text = param.trimmingCharacters(in: .whitespacesAndNewlines)
-    if text.isEmpty || text.utf16.count > maxChars { return .none }
+    if text.isEmpty || text.utf16.count > maxChars {
+      return .none
+    }
     return currentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       ? .apply(text) : .conflict(text)
   }

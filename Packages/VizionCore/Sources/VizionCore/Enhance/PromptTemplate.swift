@@ -21,11 +21,13 @@ public struct PromptTemplate: Sendable, Identifiable, Hashable {
       mode: .expand, text: "Review this function and tell me what's wrong with it."
     ),
     PromptTemplate(
-      id: "rewrite-tone", title: "Rewrite in a different tone", hint: "Same content, different register",
+      id: "rewrite-tone", title: "Rewrite in a different tone",
+      hint: "Same content, different register",
       mode: .reformat, text: "Rewrite this announcement so it sounds warmer and less corporate."
     ),
     PromptTemplate(
-      id: "summarize", title: "Summarize a long document", hint: "Say what kind of summary you want",
+      id: "summarize", title: "Summarize a long document",
+      hint: "Say what kind of summary you want",
       mode: .clarify, text: "Summarize this report."
     ),
     PromptTemplate(
@@ -33,7 +35,8 @@ public struct PromptTemplate: Sendable, Identifiable, Hashable {
       mode: .expand, text: "Give me some ideas for names for a prompt-engineering app."
     ),
     PromptTemplate(
-      id: "image", title: "Describe an image to generate", hint: "Turn a rough visual idea into a prompt",
+      id: "image", title: "Describe an image to generate",
+      hint: "Turn a rough visual idea into a prompt",
       mode: .target, text: "A lighthouse at dusk, dramatic and moody."
     ),
     PromptTemplate(

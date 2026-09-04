@@ -32,7 +32,11 @@ extension Path {
       case let .line(x, y):
         addLine(to: CGPoint(x: x, y: y))
       case let .cubic(x1, y1, x2, y2, x, y):
-        addCurve(to: CGPoint(x: x, y: y), control1: CGPoint(x: x1, y: y1), control2: CGPoint(x: x2, y: y2))
+        addCurve(
+          to: CGPoint(x: x, y: y),
+          control1: CGPoint(x: x1, y: y1),
+          control2: CGPoint(x: x2, y: y2)
+        )
       case let .quad(x1, y1, x, y):
         addQuadCurve(to: CGPoint(x: x, y: y), control: CGPoint(x: x1, y: y1))
       case .close:

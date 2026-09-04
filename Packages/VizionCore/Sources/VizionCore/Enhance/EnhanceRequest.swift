@@ -9,7 +9,9 @@ public enum RefineKind: String, CaseIterable, Codable, Sendable, Identifiable, H
   case tone
   case answers
 
-  public var id: String { rawValue }
+  public var id: String {
+    rawValue
+  }
 
   /// Chip label; `answers` has no chip.
   public var chipLabel: String? {
@@ -52,9 +54,9 @@ public struct EnhanceRefine: Codable, Sendable, Hashable {
 /// inert, a `null` would be a 400.
 public struct EnhanceRequest: Codable, Sendable, Hashable {
   /// Hard ceiling the route enforces (413 above it).
-  public static let maxInputChars = 20_000
+  public static let maxInputChars = 20000
   public static let maxContextItems = 4
-  public static let maxContextBlockChars = 2_000
+  public static let maxContextBlockChars = 2000
 
   public var input: String
   public var mode: EnhanceMode
@@ -101,7 +103,9 @@ public struct EnhanceRequest: Codable, Sendable, Hashable {
   /// requests fail with a sentence before a network round trip.
   public func validate() -> String? {
     let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
-    if trimmed.isEmpty { return "Provide a prompt to enhance." }
+    if trimmed.isEmpty {
+      return "Provide a prompt to enhance."
+    }
     if input.utf16.count > Self.maxInputChars {
       return "Prompt is too long (max \(Self.maxInputChars) characters)."
     }
@@ -109,7 +113,9 @@ public struct EnhanceRequest: Codable, Sendable, Hashable {
       return "That thinking level isn't available for this model."
     }
     if let mediaContext {
-      if mediaContext.count > Self.maxContextItems { return "Too many reference attachments." }
+      if mediaContext.count > Self.maxContextItems {
+        return "Too many reference attachments."
+      }
       if mediaContext.contains(where: { $0.utf16.count > Self.maxContextBlockChars }) {
         return "A reference description is too long."
       }

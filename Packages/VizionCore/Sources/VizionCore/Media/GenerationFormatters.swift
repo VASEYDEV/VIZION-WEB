@@ -33,18 +33,31 @@ public enum GenerationPrompt {
   static func midjourney(_ base: String, _ a: MediaAttributes) -> String {
     var parts: [String] = []
     let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !trimmed.isEmpty { parts.append(trimmed) }
-    if let s = a.subject, !s.isEmpty { parts.append(s) }
-    if let c = a.composition, !c.isEmpty { parts.append(c) }
-    if let l = a.lighting, !l.isEmpty { parts.append("\(l) lighting") }
-    if let s = a.style, !s.isEmpty { parts.append("\(s) style") }
-    if let m = a.mood, !m.isEmpty { parts.append("\(m) mood") }
-    if let p = a.palette, !p.isEmpty { parts.append("palette \(p.joined(separator: " "))") }
-    let ar: String
-    if let w = a.width, let h = a.height, w > 0, h > 0 {
-      ar = nearestAspect(width: w, height: h)
+    if !trimmed.isEmpty {
+      parts.append(trimmed)
+    }
+    if let s = a.subject, !s.isEmpty {
+      parts.append(s)
+    }
+    if let c = a.composition, !c.isEmpty {
+      parts.append(c)
+    }
+    if let l = a.lighting, !l.isEmpty {
+      parts.append("\(l) lighting")
+    }
+    if let s = a.style, !s.isEmpty {
+      parts.append("\(s) style")
+    }
+    if let m = a.mood, !m.isEmpty {
+      parts.append("\(m) mood")
+    }
+    if let p = a.palette, !p.isEmpty {
+      parts.append("palette \(p.joined(separator: " "))")
+    }
+    let ar: String = if let w = a.width, let h = a.height, w > 0, h > 0 {
+      nearestAspect(width: w, height: h)
     } else {
-      ar = "16:9"
+      "16:9"
     }
     return "\(parts.joined(separator: ", ")) --ar \(ar) --v 6".trimmingCharacters(in: .whitespaces)
   }
@@ -52,22 +65,42 @@ public enum GenerationPrompt {
   static func motion(_ base: String, _ a: MediaAttributes, engine: String) -> String {
     var lines: [String] = []
     let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !trimmed.isEmpty { lines.append(trimmed) }
-    if let s = a.subject, !s.isEmpty { lines.append("Subject: \(s).") }
-    if let c = a.composition, !c.isEmpty { lines.append("Camera & motion: \(c).") }
-    if let l = a.lighting, !l.isEmpty { lines.append("Lighting: \(l).") }
-    if let s = a.style, !s.isEmpty { lines.append("Style: \(s).") }
-    if let m = a.mood, !m.isEmpty { lines.append("Mood: \(m).") }
-    if let p = a.palette, !p.isEmpty { lines.append("Palette: \(p.joined(separator: ", ")).") }
+    if !trimmed.isEmpty {
+      lines.append(trimmed)
+    }
+    if let s = a.subject, !s.isEmpty {
+      lines.append("Subject: \(s).")
+    }
+    if let c = a.composition, !c.isEmpty {
+      lines.append("Camera & motion: \(c).")
+    }
+    if let l = a.lighting, !l.isEmpty {
+      lines.append("Lighting: \(l).")
+    }
+    if let s = a.style, !s.isEmpty {
+      lines.append("Style: \(s).")
+    }
+    if let m = a.mood, !m.isEmpty {
+      lines.append("Mood: \(m).")
+    }
+    if let p = a.palette, !p.isEmpty {
+      lines.append("Palette: \(p.joined(separator: ", ")).")
+    }
     return "[\(engine)] \(lines.joined(separator: " "))".trimmingCharacters(in: .whitespaces)
   }
 
   static func audioSpec(_ base: String, _ a: MediaAttributes) -> String {
     var lines: [String] = []
     let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !trimmed.isEmpty { lines.append(trimmed) }
-    if let m = a.mood, !m.isEmpty { lines.append("Mood: \(m).") }
-    if let d = a.durationSec { lines.append("Duration: ~\(Int(d.rounded()))s.") }
+    if !trimmed.isEmpty {
+      lines.append(trimmed)
+    }
+    if let m = a.mood, !m.isEmpty {
+      lines.append("Mood: \(m).")
+    }
+    if let d = a.durationSec {
+      lines.append("Duration: ~\(Int(d.rounded()))s.")
+    }
     return lines.joined(separator: " ")
   }
 }
@@ -93,8 +126,12 @@ public enum MediaBudget {
   }
 
   public static func formatBytes(_ bytes: Int) -> String {
-    if bytes < 1024 { return "\(bytes) B" }
-    if bytes < 1024 * 1024 { return "\(Int((Double(bytes) / 1024).rounded())) KB" }
+    if bytes < 1024 {
+      return "\(bytes) B"
+    }
+    if bytes < 1024 * 1024 {
+      return "\(Int((Double(bytes) / 1024).rounded())) KB"
+    }
     return String(format: "%.1f MB", Double(bytes) / (1024 * 1024))
   }
 

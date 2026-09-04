@@ -30,13 +30,15 @@ final class ProfileRepository: Sendable {
 
   func profile() async throws -> Profile? {
     let uid = try await userID()
-    let rows: [Profile] = try await client.from("profiles").select("*").eq("user_id", value: uid).limit(1).execute().value
+    let rows: [Profile] = try await client.from("profiles").select("*").eq("user_id", value: uid)
+      .limit(1).execute().value
     return rows.first
   }
 
   func appSettings() async throws -> AppSettings {
     let rows: [AppSettings] = try await client.from("app_settings")
-      .select("owner_user_id, open_access, dev_accent_strength").eq("id", value: 1).limit(1).execute().value
+      .select("owner_user_id, open_access, dev_accent_strength").eq("id", value: 1).limit(1)
+      .execute().value
     return rows.first ?? .defaults
   }
 
@@ -58,17 +60,31 @@ final class ProfileRepository: Sendable {
     }
     if let displayName = patch.displayName {
       let trimmed = displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-      if !trimmed.isEmpty, !LibraryUtil.isValidDisplayName(trimmed) { throw Failure.message(LibraryUtil.displayNameRule) }
+      if !trimmed.isEmpty,
+         !LibraryUtil
+         .isValidDisplayName(trimmed) {
+        throw Failure.message(LibraryUtil.displayNameRule)
+      }
       update["display_name"] = trimmed.isEmpty ? .null : .string(trimmed)
     }
-    if let defaultModel = patch.defaultModel { update["default_model"] = defaultModel.map { .string($0.rawValue) } ?? .null }
-    if let theme = patch.theme { update["theme"] = .string(theme.rawValue) }
-    if let avatarURL = patch.avatarURL { update["avatar_url"] = avatarURL.map(AnyJSON.string) ?? .null }
+    if let defaultModel = patch
+      .defaultModel {
+      update["default_model"] = defaultModel.map { .string($0.rawValue) } ?? .null
+    }
+    if let theme = patch.theme {
+      update["theme"] = .string(theme.rawValue)
+    }
+    if let avatarURL = patch
+      .avatarURL {
+      update["avatar_url"] = avatarURL.map(AnyJSON.string) ?? .null
+    }
     guard !update.isEmpty else { return }
     do {
       try await client.from("profiles").update(update).eq("user_id", value: uid).execute()
     } catch {
-      if "\(error)".contains("23505") { throw Failure.message("That display name is taken.") }
+      if "\(error)".contains("23505") {
+        throw Failure.message("That display name is taken.")
+      }
       throw error
     }
     if patch.fullName != nil || patch.displayName != nil || patch.avatarURL != nil {
@@ -82,7 +98,11 @@ final class ProfileRepository: Sendable {
   func uploadAvatar(png: Data) async throws -> String {
     let uid = try await userID()
     let path = "\(uid)/avatar.png"
-    try await client.storage.from("avatars").upload(path, data: png, options: FileOptions(contentType: "image/png", upsert: true))
+    try await client.storage.from("avatars").upload(
+      path,
+      data: png,
+      options: FileOptions(contentType: "image/png", upsert: true)
+    )
     let url = try client.storage.from("avatars").getPublicURL(path: path)
     let busted = "\(url.absoluteString)?v=\(Int(Date().timeIntervalSince1970))"
     try await update(ProfilePatch(avatarURL: .some(busted)))
@@ -91,7 +111,10 @@ final class ProfileRepository: Sendable {
 
   func setPasswordSet() async throws {
     let uid = try await userID()
-    try await client.from("profiles").update(["password_set": AnyJSON.bool(true)]).eq("user_id", value: uid).execute()
+    try await client.from("profiles").update(["password_set": AnyJSON.bool(true)]).eq(
+      "user_id",
+      value: uid
+    ).execute()
   }
 
   // MARK: Owner console
@@ -102,7 +125,10 @@ final class ProfileRepository: Sendable {
   }
 
   func updateAppSettings(openAccess: Bool? = nil, devAccentStrength: Int? = nil) async throws {
-    try await client.rpc("update_app_settings", params: OwnerParams(p_open_access: openAccess, p_dev_accent_strength: devAccentStrength)).execute()
+    try await client.rpc(
+      "update_app_settings",
+      params: OwnerParams(p_open_access: openAccess, p_dev_accent_strength: devAccentStrength)
+    ).execute()
   }
 
   func claimOwnership() async throws -> Bool {
@@ -113,7 +139,9 @@ final class ProfileRepository: Sendable {
 
   func mediaAssets() async throws -> [MediaAssetRow] {
     try await client.from("media_assets")
-      .select("id, storage_path, kind, size_bytes, created_at, original_name, mime_type, role, status")
+      .select(
+        "id, storage_path, kind, size_bytes, created_at, original_name, mime_type, role, status"
+      )
       .order("created_at", ascending: false)
       .execute().value
   }
@@ -121,7 +149,10 @@ final class ProfileRepository: Sendable {
   func deleteMediaAsset(_ asset: MediaAssetRow) async throws {
     let uid = try await userID()
     _ = try? await client.storage.from("media").remove(paths: [asset.storage_path])
-    try await client.from("media_assets").delete().eq("id", value: asset.id).eq("user_id", value: uid).execute()
+    try await client.from("media_assets").delete().eq("id", value: asset.id).eq(
+      "user_id",
+      value: uid
+    ).execute()
   }
 
   func signedMediaURL(path: String) async throws -> URL {
@@ -147,7 +178,13 @@ final class ProfileRepository: Sendable {
   /// The DB row is created FIRST (quota enforced atomically), the object
   /// second; an upload failure deletes the pending row so nothing invisible
   /// keeps charging quota.
-  func storeAttachment(data: Data, name: String, mime: String, kind: MediaKind, role: AttachmentRole) async throws -> Reserved {
+  func storeAttachment(
+    data: Data,
+    name: String,
+    mime: String,
+    kind: MediaKind,
+    role: AttachmentRole
+  ) async throws -> Reserved {
     let params = ReserveParams(
       p_kind: kind.rawValue, p_size_bytes: data.count, p_original_name: name, p_mime_type: mime,
       p_ext: MediaKind.fileExtension(forMIME: mime), p_role: role.rawValue
@@ -157,19 +194,31 @@ final class ProfileRepository: Sendable {
       reserved = try await client.rpc("media_reserve", params: params).execute().value
     } catch {
       let text = "\(error)"
-      if text.contains("quota_exceeded") { throw Failure.message(MediaBudget.quotaMessage) }
-      if text.contains("invalid_size") { throw Failure.message("That file is too large to store (50 MB limit).") }
+      if text.contains("quota_exceeded") {
+        throw Failure.message(MediaBudget.quotaMessage)
+      }
+      if text
+        .contains("invalid_size") {
+        throw Failure.message("That file is too large to store (50 MB limit).")
+      }
       throw error
     }
     guard let row = reserved.first else { throw Failure.message("Couldn't reserve storage.") }
     do {
-      try await client.storage.from("media").upload(row.storage_path, data: data, options: FileOptions(contentType: mime))
+      try await client.storage.from("media").upload(
+        row.storage_path,
+        data: data,
+        options: FileOptions(contentType: mime)
+      )
       _ = try await client.rpc("media_commit", params: ["p_id": row.id]).execute()
       return row
     } catch {
       _ = try? await client.storage.from("media").remove(paths: [row.storage_path])
-      let uid = (try? await userID()) ?? ""
-      try? await client.from("media_assets").delete().eq("id", value: row.id).eq("user_id", value: uid).execute()
+      let uid = await (try? userID()) ?? ""
+      try? await client.from("media_assets").delete().eq("id", value: row.id).eq(
+        "user_id",
+        value: uid
+      ).execute()
       throw error
     }
   }
@@ -181,18 +230,29 @@ final class ProfileRepository: Sendable {
   /// Profile, prompts + versions, and media METADATA as pretty JSON.
   func exportJSON() async throws -> Data {
     let uid = try await userID()
-    async let profile: [[String: AnyJSON]] = client.from("profiles").select("*").eq("user_id", value: uid).execute().value
-    async let prompts: [[String: AnyJSON]] = client.from("prompts").select("*").order("created_at", ascending: true).execute().value
-    async let versions: [[String: AnyJSON]] = client.from("prompt_versions").select("*").order("created_at", ascending: true).execute().value
+    async let profile: [[String: AnyJSON]] = client.from("profiles").select("*").eq(
+      "user_id",
+      value: uid
+    ).execute().value
+    async let prompts: [[String: AnyJSON]] = client.from("prompts").select("*").order(
+      "created_at",
+      ascending: true
+    ).execute().value
+    async let versions: [[String: AnyJSON]] = client.from("prompt_versions").select("*").order(
+      "created_at",
+      ascending: true
+    ).execute().value
     async let media: [[String: AnyJSON]] = client.from("media_assets")
-      .select("id, storage_path, kind, size_bytes, created_at, original_name, mime_type, role, status")
+      .select(
+        "id, storage_path, kind, size_bytes, created_at, original_name, mime_type, role, status"
+      )
       .order("created_at", ascending: true).execute().value
-    let payload: [String: AnyJSON] = [
+    let payload: [String: AnyJSON] = try await [
       "exportedAt": .string(PostgresDate.format(Date())),
-      "profile": try await profile.first.map(AnyJSON.object) ?? .null,
-      "prompts": .array(try await prompts.map(AnyJSON.object)),
-      "prompt_versions": .array(try await versions.map(AnyJSON.object)),
-      "media_assets": .array(try await media.map(AnyJSON.object)),
+      "profile": profile.first.map(AnyJSON.object) ?? .null,
+      "prompts": .array(prompts.map(AnyJSON.object)),
+      "prompt_versions": .array(versions.map(AnyJSON.object)),
+      "media_assets": .array(media.map(AnyJSON.object)),
     ]
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

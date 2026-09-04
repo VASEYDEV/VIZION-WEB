@@ -25,23 +25,27 @@ public enum SHA256 {
     var padded = message
     let bitLength = UInt64(message.count) * 8
     padded.append(0x80)
-    while padded.count % 64 != 56 { padded.append(0) }
-    for i in (0..<8).reversed() { padded.append(UInt8((bitLength >> (UInt64(i) * 8)) & 0xFF)) }
+    while padded.count % 64 != 56 {
+      padded.append(0)
+    }
+    for i in (0 ..< 8).reversed() {
+      padded.append(UInt8((bitLength >> (UInt64(i) * 8)) & 0xFF))
+    }
 
     var w = [UInt32](repeating: 0, count: 64)
     for chunk in stride(from: 0, to: padded.count, by: 64) {
-      for i in 0..<16 {
+      for i in 0 ..< 16 {
         let b = chunk + i * 4
         w[i] = UInt32(padded[b]) << 24 | UInt32(padded[b + 1]) << 16 | UInt32(padded[b + 2]) << 8
           | UInt32(padded[b + 3])
       }
-      for i in 16..<64 {
+      for i in 16 ..< 64 {
         let s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3)
         let s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >> 10)
         w[i] = w[i - 16] &+ s0 &+ w[i - 7] &+ s1
       }
       var a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7]
-      for i in 0..<64 {
+      for i in 0 ..< 64 {
         let s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)
         let ch = (e & f) ^ (~e & g)
         let t1 = hh &+ s1 &+ ch &+ k[i] &+ w[i]
