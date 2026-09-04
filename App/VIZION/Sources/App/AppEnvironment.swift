@@ -32,6 +32,9 @@ final class AppEnvironment {
   private(set) var profile: Profile?
   private(set) var appSettings: AppSettings = .defaults
   private(set) var sessionResolved = false
+  /// The account whose composer defaults the UI store carries — hydration
+  /// happens once per account (web `ProfileHydrator`), never per refresh.
+  private var hydratedUserID: String?
   /// A `?draft=` that arrived while the app was signed out or mid-launch.
   var pendingDraft: String?
   var pendingPromptID: String?
@@ -103,28 +106,39 @@ final class AppEnvironment {
       case .signedOut:
         session = nil
         profile = nil
+        hydratedUserID = nil
       default:
         break
       }
     }
   }
 
-  /// Re-read the profile + owner settings and hydrate the UI store (once per
-  /// account switch — Settings is authoritative for what the app opens on).
+  /// Re-read the profile + owner settings. Composer defaults hydrate ONCE per
+  /// account (web `ProfileHydrator`): a refresh after a Settings write must
+  /// not overwrite the model picked for the current prompt.
   func refreshAccount() async {
     guard let profiles, let session else { return }
+    let userID = session.userID
+    let accountChanged = hydratedUserID != userID
+    // Shared-device rule first, before any network: another account's result
+    // and profile must be gone even if the requests below fail.
+    results.adopt(userID: userID)
+    if accountChanged {
+      profile = nil
+    }
     do {
       async let profileTask = profiles.profile()
       async let settingsTask = profiles.appSettings()
       let (profile, settings) = try await (profileTask, settingsTask)
       self.profile = profile
       appSettings = settings
-      ui.hydrate(profile: profile, userID: session.userID)
-      results.adopt(userID: session.userID)
     } catch {
-      // Offline at launch: keep the last-known profile and let the screens
-      // report their own failures.
-      ui.hydrate(profile: profile, userID: session.userID)
+      // Offline at launch: keep the last-known profile (of THIS account) and
+      // let the screens report their own failures.
+    }
+    if accountChanged {
+      ui.hydrate(profile: profile, userID: userID)
+      hydratedUserID = userID
     }
   }
 
@@ -133,6 +147,7 @@ final class AppEnvironment {
     try? await supabase?.signOut()
     session = nil
     profile = nil
+    hydratedUserID = nil
   }
 
   // MARK: URL intake

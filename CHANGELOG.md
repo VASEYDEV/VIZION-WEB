@@ -59,6 +59,10 @@ All notable changes to VIZION for iOS are documented here. The format follows
   keeps the default order its query actually uses.
 - **Settings**: writes from one control run in order and only the latest may
   report or roll back.
+- **Accounts**: the last result is re-scoped to the signed-in user before any
+  network call, so another account's cached enhancement can never show even
+  when the profile request fails; composer defaults hydrate once per account
+  (web `ProfileHydrator`), not on every refresh.
 - **Lint**: SwiftLint config matched to the wire-shaped Codable rows and the
   cursor tuples; SVG path data in tight disable regions; long user copy as
   multi-line literals; `LibraryRepository`, `LibraryScreen` and the composer
