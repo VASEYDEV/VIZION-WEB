@@ -59,6 +59,12 @@ All notable changes to VIZION for iOS are documented here. The format follows
   keeps the default order its query actually uses.
 - **Settings**: writes from one control run in order and only the latest may
   report or roll back.
+- **Settings**: a failed stored-media refresh keeps the last-known rows and
+  shows the error with Retry instead of reading as "0 B stored".
+- **Collections**: rename is reachable (swipe → Rename → name prompt), as the
+  web's per-row rename.
+- **Companion patch**: account deletion stops if the avatar removal reports
+  an error, so a public avatar can never outlive its owner's credentials.
 - **Accounts**: the last result is re-scoped to the signed-in user before any
   network call, so another account's cached enhancement can never show even
   when the profile request fails; composer defaults hydrate once per account

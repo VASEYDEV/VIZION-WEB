@@ -141,6 +141,18 @@ struct CollectionSheet: View {
   var card: PromptCard
   @Environment(\.dismiss) private var dismiss
   @State private var newName = ""
+  /// Web `CollectionSheet`: rename per row, inline; here a swipe action opens
+  /// the name prompt.
+  @State private var renameID: String?
+  @State private var renameDraft = ""
+
+  private var renaming: Binding<Bool> {
+    Binding(get: { renameID != nil }, set: {
+      if !$0 {
+        renameID = nil
+      }
+    })
+  }
 
   var body: some View {
     NavigationStack {
@@ -175,6 +187,13 @@ struct CollectionSheet: View {
                   systemImage: "trash"
                 )
               }
+              Button {
+                renameDraft = c.name
+                renameID = c.id
+              } label: {
+                Label("Rename", systemImage: "pencil")
+              }
+              .tint(VZ.accent)
             }
           }
         }
@@ -196,6 +215,17 @@ struct CollectionSheet: View {
         .listRowBackground(VZ.surface)
       }
       .scrollContentBackground(.hidden)
+      .alert("Rename collection", isPresented: renaming) {
+        TextField("Name", text: $renameDraft)
+        Button("Save") {
+          let name = renameDraft.trimmingCharacters(in: .whitespaces)
+          if let id = renameID, !name.isEmpty {
+            Task { await model.renameCollection(id, to: name) }
+          }
+          renameID = nil
+        }
+        Button("Cancel", role: .cancel) { renameID = nil }
+      }
       .navigationTitle("Move to collection")
       .navigationBarTitleDisplayMode(.inline)
     }

@@ -110,10 +110,10 @@ index 29c0c4f..a4256fa 100644
      return redirect("/profile?delete_error=failed");
 diff --git a/src/lib/auth/delete-account.ts b/src/lib/auth/delete-account.ts
 new file mode 100644
-index 0000000..242cb30
+index 0000000..fb1c076
 --- /dev/null
 +++ b/src/lib/auth/delete-account.ts
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,45 @@
 +import "server-only";
 +import type { createAdminClient } from "@/lib/supabase/admin";
 +
@@ -146,8 +146,14 @@ index 0000000..242cb30
 +    if (rmErr) throw new Error(`media remove failed: ${rmErr.message}`);
 +    if (objects.length < 100) break;
 +  }
-+  // Avatar lives at a fixed path; a missing object is not an error.
-+  await admin.storage.from("avatars").remove([`${userId}/avatar.png`]);
++  // Avatar lives at a fixed path; a missing object is not an error (Storage
++  // answers success for absent keys) — but a failed request must stop the
++  // deletion: a public avatar with no owner left to authenticate could never
++  // be removed again.
++  const { error: avatarErr } = await admin.storage
++    .from("avatars")
++    .remove([`${userId}/avatar.png`]);
++  if (avatarErr) throw new Error(`avatar remove failed: ${avatarErr.message}`);
 +
 +  // Cascades every public row keyed to this user and ends the account itself.
 +  const { error: authErr } = await admin.auth.admin.deleteUser(userId);
@@ -277,10 +283,10 @@ index 6c8a05c..fde2c8a 100644
 +}
 diff --git a/tests/unit/account-route.test.ts b/tests/unit/account-route.test.ts
 new file mode 100644
-index 0000000..a5c9a5d
+index 0000000..8316f4f
 --- /dev/null
 +++ b/tests/unit/account-route.test.ts
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,84 @@
 +import { beforeEach, describe, expect, it, vi } from "vitest";
 +
 +/**
@@ -297,7 +303,9 @@ index 0000000..a5c9a5d
 +}));
 +const storeMock = vi.hoisted(() => ({
 +  list: vi.fn(async () => ({ data: [{ name: "asset.png" }], error: null })),
-+  remove: vi.fn(async () => ({ error: null })),
++  remove: vi.fn<(paths: string[]) => Promise<{ error: { message: string } | null }>>(
++    async () => ({ error: null }),
++  ),
 +}));
 +const adminMock = vi.hoisted(() => ({
 +  storage: { from: vi.fn(() => storeMock) },
@@ -344,6 +352,20 @@ index 0000000..a5c9a5d
 +
 +  it("500s and stops at the first failing step", async () => {
 +    storeMock.list.mockResolvedValue({ data: null, error: { message: "boom" } } as never);
++    const res = await DELETE();
++    expect(res.status).toBe(500);
++    expect(adminMock.auth.admin.deleteUser).not.toHaveBeenCalled();
++  });
++
++  it("500s when the avatar removal reports an error — the auth user survives", async () => {
++    // A fresh user id: the route's limiter is keyed per user and the cases
++    // above have already spent u1's budget.
++    supabaseMock.auth.getUser.mockResolvedValue({ data: { user: { id: "u2" } } });
++    storeMock.remove.mockImplementation(async (paths: string[]) =>
++      paths[0]?.endsWith("/avatar.png")
++        ? { error: { message: "boom" } }
++        : { error: null },
++    );
 +    const res = await DELETE();
 +    expect(res.status).toBe(500);
 +    expect(adminMock.auth.admin.deleteUser).not.toHaveBeenCalled();

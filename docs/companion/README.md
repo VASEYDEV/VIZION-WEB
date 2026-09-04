@@ -16,7 +16,7 @@ native client (ADR-0003):
 | `tests/unit/account-route.test.ts` | **new** 4 cases |
 
 Validated in this repo's session against the web clone: `npm run typecheck` ✓,
-`eslint` ✓, `prettier --check` ✓, and the affected Vitest files (77 tests) ✓;
+`eslint` ✓, `prettier --check` ✓, and the affected Vitest files (78 tests) ✓;
 `git apply --check` against a clean `origin/main` worktree ✓.
 
 ## Apply

@@ -86,4 +86,10 @@
 - **Ordering rules must be the web's, not the reviewer's.** Object-then-row on
   delete, composer-then-server on draft resume, fail-open on the settings row:
   each came straight from `pipeline.ts` / `DraftsList.tsx` / `settings.ts`.
+- **`set -e` does not fire inside `a && b && c`, and `cd` leaks into `git`.** A
+  Python assertion in an `&&` chain was ignored, the chain rolled on, and a
+  `git commit` meant for this repo landed on the web clone's `main` (the push
+  went to the wrong remote and was refused — nothing left the machine). Put
+  multi-step verification in a script with `set -euo pipefail`, one command
+  per line, and address git with `git -C /absolute/path` — never the cwd.
 

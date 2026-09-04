@@ -452,6 +452,9 @@ struct AppearanceSection: View {
 struct DataPrivacySection: View {
   @Environment(AppEnvironment.self) private var env
   @State private var media: [MediaAssetRow] = []
+  /// A failed refresh keeps the last-known rows; an empty list would read as
+  /// "0 B stored" and hide every removal control.
+  @State private var mediaError: String?
   @State private var exportURL: URL?
   @State private var exportStatus: FieldStatus.Status = .idle
   @State private var confirmDelete = false
@@ -489,6 +492,13 @@ struct DataPrivacySection: View {
             .buttonStyle(.quiet)
         }
         ProgressView(value: min(budget.fraction, 1)).tint(budget.warn ? VZ.amber : VZ.accent)
+        if let mediaError {
+          HStack(spacing: 8) {
+            Text("Couldn't refresh stored media. \(mediaError)").font(.vzBody(12))
+              .foregroundStyle(VZ.flare)
+            Button("Retry") { Task { await loadMedia() } }.buttonStyle(.secondaryInline)
+          }
+        }
         ForEach(media) { asset in
           HStack(spacing: 8) {
             Text(asset.original_name ?? asset.storage_path).font(.vzBody(12))
@@ -564,7 +574,12 @@ struct DataPrivacySection: View {
   }
 
   private func loadMedia() async {
-    media = await (try? env.profiles?.mediaAssets()) ?? []
+    do {
+      media = try await env.profiles?.mediaAssets() ?? []
+      mediaError = nil
+    } catch {
+      mediaError = error.localizedDescription
+    }
   }
 
   private func delete(_ asset: MediaAssetRow) async {
