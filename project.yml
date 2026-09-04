@@ -1,0 +1,140 @@
+# VIZION — XcodeGen spec. The .xcodeproj is GENERATED (gitignored): edit this
+# file, then `make generate` (or `xcodegen generate`). Reviewable diffs, no
+# pbxproj merge conflicts. https://github.com/yonaskolb/XcodeGen
+name: VIZION
+
+options:
+  bundleIdPrefix: ai.vasey
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  groupSortPosition: top
+  defaultConfig: Debug
+
+configs:
+  Debug: debug
+  Release: release
+
+# Per-environment values (Supabase URL/anon key, API base, team id). The real
+# file is gitignored; scripts/bootstrap.sh copies the example into place.
+configFiles:
+  Debug: Config/Secrets.xcconfig
+  Release: Config/Secrets.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: "$(VIZION_TEAM_ID)"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    GENERATE_INFOPLIST_FILE: NO
+  configs:
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+      ONLY_ACTIVE_ARCH: YES
+    Release:
+      SWIFT_COMPILATION_MODE: wholemodule
+
+packages:
+  VizionCore:
+    path: Packages/VizionCore
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: "2.0.0"
+
+targets:
+  VIZION:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/VIZION/Sources
+      - path: App/VIZION/Resources
+        # Fonts + asset catalog are copied as bundle resources.
+    dependencies:
+      - package: VizionCore
+      - package: Supabase
+        product: Supabase
+    info:
+      path: App/VIZION/Info.plist
+      properties:
+        CFBundleDisplayName: VIZION
+        CFBundleName: VIZION
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIUserInterfaceStyle: Automatic
+        ITSAppUsesNonExemptEncryption: false
+        UIApplicationSupportsIndirectInputEvents: true
+        NSPhotoLibraryUsageDescription: A photo you attach is sent to the AI model you selected so it can describe the image for your prompt. It is saved to your private VIZION storage only if you choose to keep it.
+        NSCameraUsageDescription: VIZION can photograph a reference to attach to your prompt.
+        # vizion://enhance?draft=…  (Siri Shortcuts + share sheet)  and
+        # vizion://auth/callback     (Supabase OAuth / magic-link PKCE return)
+        CFBundleURLTypes:
+          - CFBundleURLName: ai.vasey.vizion
+            CFBundleURLSchemes: [vizion]
+        # Registered from Resources/Fonts (SIL OFL — see OFL.txt alongside).
+        UIAppFonts:
+          - BebasNeue-Regular.ttf
+          - RedditSans-400.ttf
+          - RedditSans-500.ttf
+          - RedditSans-600.ttf
+          - JetBrainsMono-400.ttf
+        # Build-time configuration (Config/Secrets.xcconfig → AppConfig.swift).
+        SupabaseURL: $(SUPABASE_URL)
+        SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        VizionAPIBaseURL: $(VIZION_API_BASE_URL)
+    entitlements:
+      path: App/VIZION/VIZION.entitlements
+      properties: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.vasey.vizion
+        PRODUCT_NAME: VIZION
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        SUPPORTS_MACCATALYST: NO
+    scheme:
+      testTargets:
+        - VIZIONTests
+      gatherCoverageData: true
+
+  VIZIONTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: App/VIZIONTests
+    dependencies:
+      - target: VIZION
+      - package: VizionCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.vasey.vizion.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  VIZION:
+    build:
+      targets:
+        VIZION: all
+        VIZIONTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - VIZIONTests
+      gatherCoverageData: true
+    archive:
+      config: Release

@@ -1,0 +1,36 @@
+# Xcode
+*.xcodeproj/
+!*.xcodeproj/project.pbxproj
+*.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.hmap
+*.moved-aside
+Pods/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/*/.build/
+Package.resolved.bak
+
+# Secrets — never commit real values (see Config/Secrets.example.xcconfig)
+Config/Secrets.xcconfig
+*.p8
+*.p12
+*.mobileprovision
+.env
+.env.*
+
+# Tooling
+.DS_Store
+*.log
+node_modules/
+.vscode/
+.idea/
