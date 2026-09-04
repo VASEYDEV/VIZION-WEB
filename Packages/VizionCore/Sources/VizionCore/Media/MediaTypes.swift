@@ -128,8 +128,21 @@ public enum AttachmentRole: String, CaseIterable, Codable, Sendable, Identifiabl
     allCases.filter { $0.kinds.contains(kind) }
   }
 
-  /// Which /api/media analysis intent produces this role's attrs/text. nil
-  /// for roles that need no model pass (audio, generate-only).
+  /// The intent sent to `/api/media` for this role (web `ROLE_INTENT`):
+  /// Describe asks for the editable description; Generate analyzes like a
+  /// reference.
+  public var requestIntent: MediaAnalysisIntent? {
+    switch self {
+    case .reference, .generate: .reference
+    case .describe: .describe
+    case .style: .style
+    case .extract: .extractText
+    }
+  }
+
+  /// The analysis FAMILY (web `intentFamily`): roles within a family share
+  /// results, a change across families re-analyzes. Describe shares the
+  /// reference family.
   public var analysisIntent: MediaAnalysisIntent? {
     switch self {
     case .reference, .describe, .generate: .reference

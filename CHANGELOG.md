@@ -50,6 +50,15 @@ All notable changes to VIZION for iOS are documented here. The format follows
   with Retry instead of an endless spinner.
 - **Privacy**: the photo-library purpose string states that an attached photo
   is sent to the selected model for analysis and stored only if kept.
+- **Sign-in**: magic-link signup stays closed until the open-access setting
+  has actually loaded (fail-open afterwards, as the web).
+- **Attachments**: the Describe role sends the `describe` intent (web
+  `ROLE_INTENT`); it still shares the reference analysis family.
+- **Library**: a draft body that fails to load shows the error with Retry
+  instead of an empty editor; the Drafts view hides the sort control and
+  keeps the default order its query actually uses.
+- **Settings**: writes from one control run in order and only the latest may
+  report or roll back.
 - **Lint**: SwiftLint config matched to the wire-shaped Codable rows and the
   cursor tuples; SVG path data in tight disable regions; long user copy as
   multi-line literals; `LibraryRepository`, `LibraryScreen` and the composer

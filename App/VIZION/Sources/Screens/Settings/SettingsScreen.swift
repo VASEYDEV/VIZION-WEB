@@ -85,26 +85,48 @@ struct FieldStatus: View {
   }
 }
 
-/// Optimistic write helper: apply, round-trip, roll back on failure.
+/// Optimistic write helper: apply, round-trip, roll back on failure. Writes
+/// from one call site run in order and only the latest may report or roll
+/// back, so two quick selections can neither land on the server out of order
+/// nor revert a newer choice when the older request fails last.
 @MainActor
 func settingWrite(
   _ status: Binding<FieldStatus.Status>,
+  site: String = "\(#fileID):\(#line)",
   rollback: @escaping () -> Void = {},
   work: @escaping () async throws -> Void
 ) {
-  Task {
+  let generation = SettingWrites.next(site)
+  let previous = SettingWrites.chains[site]
+  SettingWrites.chains[site] = Task {
+    await previous?.value
     status.wrappedValue = .saving
     do {
       try await work()
+      guard SettingWrites.generations[site] == generation else { return }
       status.wrappedValue = .saved
       try? await Task.sleep(for: .seconds(2))
-      if status.wrappedValue == .saved {
+      if status.wrappedValue == .saved, SettingWrites.generations[site] == generation {
         status.wrappedValue = .idle
       }
     } catch {
+      guard SettingWrites.generations[site] == generation else { return }
       rollback()
       status.wrappedValue = .failed(error.localizedDescription)
     }
+  }
+}
+
+/// Per-call-site bookkeeping for `settingWrite`.
+@MainActor
+private enum SettingWrites {
+  static var chains: [String: Task<Void, Never>] = [:]
+  static var generations: [String: Int] = [:]
+
+  static func next(_ site: String) -> Int {
+    let n = (generations[site] ?? 0) + 1
+    generations[site] = n
+    return n
   }
 }
 

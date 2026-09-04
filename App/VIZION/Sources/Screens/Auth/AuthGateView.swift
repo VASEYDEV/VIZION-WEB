@@ -6,14 +6,17 @@ import VizionCore
 /// auth: Supabase Auth only.
 struct AuthGateView: View {
   @Environment(AppEnvironment.self) private var env
-  @State private var openAccess = true
+  /// nil until the settings row answers: signup is CLOSED while unknown, so a
+  /// magic link sent before the answer can never mint an account the owner
+  /// has disabled. (The web reads the row server-side before rendering.)
+  @State private var openAccess: Bool?
 
   var body: some View {
     ScrollView {
       VStack(spacing: 32) {
         Spacer(minLength: 24)
         AuthHero()
-        SignInForm(registrationClosed: !openAccess)
+        SignInForm(registrationClosed: openAccess == false, signupAllowed: openAccess == true)
         Spacer(minLength: 16)
         VizionFooter()
       }
@@ -25,9 +28,9 @@ struct AuthGateView: View {
     .task {
       // Owner switch: when access is closed the magic-link path must not mint
       // NEW accounts. Readable pre-auth (the web reads it the same way).
-      if let settings = try? await env.profiles?.appSettings() {
-        openAccess = settings.open_access
-      }
+      // Fail OPEN on availability, as the web does: a missing row must never
+      // lock everyone out — but only once the request has actually answered.
+      openAccess = await (try? env.profiles?.appSettings())?.open_access ?? true
     }
   }
 }
@@ -56,6 +59,8 @@ struct SignInForm: View {
   }
 
   var registrationClosed: Bool
+  /// False while the open-access setting is still loading.
+  var signupAllowed: Bool
 
   @Environment(AppEnvironment.self) private var env
   @State private var email = ""
@@ -201,7 +206,7 @@ struct SignInForm: View {
         try await supabase.signIn(email: address, password: password)
         status = .idle
       } else {
-        try await supabase.sendMagicLink(email: address, allowSignup: !registrationClosed)
+        try await supabase.sendMagicLink(email: address, allowSignup: signupAllowed)
         status = .sent(address)
       }
     } catch {

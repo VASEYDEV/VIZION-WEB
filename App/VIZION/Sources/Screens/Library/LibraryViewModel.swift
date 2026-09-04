@@ -234,8 +234,9 @@ final class LibraryViewModel {
     await mutate { try await library?.deleteDraft(id: draft.id) }
   }
 
-  func draftBody(_ draft: DraftCard) async -> LibraryRepository.DraftBody? {
-    try? await library?.draftBody(id: draft.id)
+  func draftBody(_ draft: DraftCard) async throws -> LibraryRepository.DraftBody {
+    guard let library else { throw LibraryRepository.Failure.message("Not signed in.") }
+    return try await library.draftBody(id: draft.id)
   }
 
   func updateDraft(_ draft: DraftCard, body: String, expectedUpdatedAt: String) async -> Bool {

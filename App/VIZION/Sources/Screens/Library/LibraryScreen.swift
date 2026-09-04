@@ -149,6 +149,9 @@ struct LibraryBrowser: View {
       // Web: `libraryHref({ ...filter, view })` — only the view changes.
       var next = model.filter
       next.view = view
+      if view == .drafts {
+        next.sort = .updated // drafts always list by last edit
+      }
       model.filter = next
     } label: {
       ChipLabel(text: label, selected: model.filter.view == view)

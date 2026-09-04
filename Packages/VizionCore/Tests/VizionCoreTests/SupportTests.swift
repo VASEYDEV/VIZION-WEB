@@ -77,6 +77,9 @@ final class SupportTests: XCTestCase {
     XCTAssertEqual(MediaKind.fileExtension(forMIME: "image/jpeg"), "jpg")
     XCTAssertEqual(AttachmentRole.roles(for: .audio), [.reference, .generate])
     XCTAssertEqual(AttachmentRole.extract.analysisIntent, .extractText)
+    XCTAssertEqual(AttachmentRole.describe.requestIntent, .describe)
+    XCTAssertEqual(AttachmentRole.describe.analysisIntent, .reference)
+    XCTAssertEqual(AttachmentRole.generate.requestIntent, .reference)
     XCTAssertEqual(GenTarget.default(for: .video), .runway)
     XCTAssertEqual(
       MediaAnalysisRequest.dataURL(mime: "image/png", base64: "AAAA"),

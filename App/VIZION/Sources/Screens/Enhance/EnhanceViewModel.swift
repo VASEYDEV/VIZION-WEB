@@ -543,7 +543,9 @@ extension EnhanceViewModel {
           $0.storagePath = reserved.storage_path
         }
       }
-      guard let intent = a.role.analysisIntent, let jpeg = a.analysisJPEG else {
+      guard let intent = a.role.analysisIntent, let requestIntent = a.role.requestIntent,
+            let jpeg = a.analysisJPEG
+      else {
         patch { $0.status = .ready }
         return
       }
@@ -558,7 +560,8 @@ extension EnhanceViewModel {
             mime: "image/jpeg",
             base64: jpeg.base64EncodedString()
           ),
-          target: target, intent: intent, auto: ui.autoTarget, autoPreference: ui.autoPreference
+          target: target, intent: requestIntent, auto: ui.autoTarget,
+          autoPreference: ui.autoPreference
         )
       )
       // The role may have changed while the request was in flight. A different

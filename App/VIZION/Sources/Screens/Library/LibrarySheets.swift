@@ -21,25 +21,31 @@ struct LibraryFilterSheet: View {
                 set: {
                   if let v = $0 {
                     draft.view = v
+                    // Drafts always list by last edit (the query has no sort).
+                    if v == .drafts {
+                      draft.sort = .updated
+                    }
                   }
                 }
               ),
               accessibilityLabel: "View"
             )
           }
-          group("Sort") {
-            VZSegmented(
-              options: LibrarySort.allCases.map { (id: $0, label: $0.label) },
-              selection: Binding(
-                get: { Optional(draft.sort) },
-                set: {
-                  if let v = $0 {
-                    draft.sort = v
+          if draft.view != .drafts {
+            group("Sort") {
+              VZSegmented(
+                options: LibrarySort.allCases.map { (id: $0, label: $0.label) },
+                selection: Binding(
+                  get: { Optional(draft.sort) },
+                  set: {
+                    if let v = $0 {
+                      draft.sort = v
+                    }
                   }
-                }
-              ),
-              accessibilityLabel: "Sort"
-            )
+                ),
+                accessibilityLabel: "Sort"
+              )
+            }
           }
           if !model.facets.models.isEmpty {
             group("Model") {
@@ -205,6 +211,7 @@ struct DraftEditorSheet: View {
   @State private var body_ = ""
   @State private var expectedUpdatedAt = ""
   @State private var loaded = false
+  @State private var loadError: String?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -224,20 +231,34 @@ struct DraftEditorSheet: View {
           }
         }
         .buttonStyle(.laser)
+      } else if let loadError {
+        // Never an empty editor over a failed load: a save from it would only
+        // fail later with a misleading conflict.
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Couldn't open this draft. \(loadError)").font(.vzBody(13))
+            .foregroundStyle(VZ.flare)
+          Button("Retry") { Task { await load() } }.buttonStyle(.secondaryInline)
+        }
       } else {
         ProgressView().frame(maxWidth: .infinity)
       }
       Button("Cancel") { dismiss() }.buttonStyle(.quiet)
     }
     .padding(20)
-    .task {
-      if let body = await model.draftBody(draft) {
-        body_ = body.body
-        expectedUpdatedAt = body.updatedAt
-      }
-      loaded = true
-    }
+    .task { await load() }
     .vzSheet(detents: [.large])
+  }
+
+  private func load() async {
+    loadError = nil
+    do {
+      let body = try await model.draftBody(draft)
+      body_ = body.body
+      expectedUpdatedAt = body.updatedAt
+      loaded = true
+    } catch {
+      loadError = error.localizedDescription
+    }
   }
 }
 
