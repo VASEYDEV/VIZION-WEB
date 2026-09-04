@@ -33,7 +33,8 @@ struct VizionFooter: View {
           .monospacedDigit()
         Text(
           """
-          © \(String(Self.year)) [VASEY Multimedia](https://vaseymultimedia.com). All rights reserved.
+          © \(String(Self.year)) [VASEY Multimedia](https://vaseymultimedia.com). \
+          All rights reserved.
           Designed & engineered by [VASEY/AI](https://vasey.ai)
           """
         )
