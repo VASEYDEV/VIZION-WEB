@@ -81,3 +81,17 @@ step then failed before running: the simulator-name grep captured a trailing
 space (`iPhone 16 Pro `), which the destination matcher rejects. Fixed in the
 workflow; the app unit tests (UIStore, AppConfig) are the next unknown.
 
+**Review rounds (same session, 02:25–03:00 UTC).** Codex reviewed every push
+and raised 31 findings across five rounds; each was checked against the web
+sources before anything changed. 28 were real defects in the port and are
+fixed (media lifecycle and quota, owner-console toggle hydration, run and
+revision generations, stale load-more pages, draft-editor and version-body
+failure states, the tray cap, the signup gate while settings load, the
+Describe wire intent, serialized settings writes, success toasts gated on
+the write). Three were declined or narrowed because the web deliberately
+behaves that way — refinement saves keep the original submitted input,
+Reference and Describe share one analysis family, Clear never touches the
+tray — and the threads say so with the web reference. Every thread is
+resolved. First fully green CI (core · xcodebuild + app unit tests · lint):
+`5e5d95d`; green again on the review heads through `db8b6e4`.
+

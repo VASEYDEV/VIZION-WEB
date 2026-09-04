@@ -68,3 +68,22 @@
   grep the moved code for every `private` it touches (`client` was missed) and
   lift those to internal in the same commit.
 
+## 2026-09-04 — Review rounds on PR #1
+
+- **Check every bot finding against the web before changing anything.** 28 of
+  31 were real; the 3 that were not all pointed at behaviour the web chose on
+  purpose (refinement provenance, the describe/reference family, Clear leaving
+  the tray). "The web wins" (CLAUDE.md §1) decided those in minutes — and the
+  reply on the thread cites the file so the next reviewer does not re-raise it.
+- **Every fire-and-forget Task needs an owner generation.** Runs, revisions and
+  settings writes all had the same bug shape: a cancelled or slower predecessor
+  finishing after its replacement and writing stale state. One counter bumped
+  on start/cancel, checked after every await, fixes the class; a helper such as
+  `finish(generation:failure:)` keeps the guard out of the hot loop.
+- **A `try?` in a load path is a spinner that never ends.** Version bodies,
+  draft bodies and the settings row each hid a failure behind `nil`; record the
+  error and show a Retry instead.
+- **Ordering rules must be the web's, not the reviewer's.** Object-then-row on
+  delete, composer-then-server on draft resume, fail-open on the settings row:
+  each came straight from `pipeline.ts` / `DraftsList.tsx` / `settings.ts`.
+

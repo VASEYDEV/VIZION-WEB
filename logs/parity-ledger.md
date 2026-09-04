@@ -60,6 +60,7 @@ Legend: ✅ ported · 🟡 partial / simplified · ⬜ not yet · ➖ not applic
 | Favorites · archive · soft delete + undo · Recently deleted · delete forever | ✅ | |
 | Rename · tags · collections CRUD · move | ✅ | |
 | Swipe actions | ⬜ | all actions in the context menu (swipe needs a List host) |
+| CI proof of the app target | ✅ | `xcodebuild` builds + runs the app unit tests on the iOS Simulator (macOS runner) since `5e5d95d` |
 | Developer-accent card field | ✅ | |
 | Activity feed | ✅ | |
 | Drafts: save from New prompt, resume (move), edit in place (OCC), delete, search body | ✅ | |
