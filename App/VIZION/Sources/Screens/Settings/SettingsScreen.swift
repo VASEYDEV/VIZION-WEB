@@ -564,23 +564,35 @@ struct OwnerSection: View {
   @State private var strength = 26.0
   @State private var status: FieldStatus.Status = .idle
 
+  /// Persists only a user edit. Hydration (`onAppear`) and the rollback assign
+  /// `openAccess` directly, so neither can issue a write — a failed redundant
+  /// write could otherwise roll back into a request that reopens access.
+  private var openAccessBinding: Binding<Bool> {
+    Binding(
+      get: { openAccess },
+      set: { next in
+        let previous = openAccess
+        guard next != previous else { return }
+        openAccess = next
+        settingWrite(
+          $status,
+          rollback: { openAccess = previous },
+          work: {
+            try await env.profiles?.updateAppSettings(openAccess: next)
+            await env.refreshAccount()
+          }
+        )
+      }
+    )
+  }
+
   var body: some View {
     SettingsSection(title: "Owner") {
       SettingsRow(
         label: "Open access",
         detail: openAccess ? "Anyone can register and use the app." : "Only you can use the app."
       ) {
-        Toggle("", isOn: $openAccess).labelsHidden().tint(VZ.accent)
-          .onChange(of: openAccess) { old, new in
-            settingWrite(
-              $status,
-              rollback: { openAccess = old },
-              work: {
-                try await env.profiles?.updateAppSettings(openAccess: new)
-                await env.refreshAccount()
-              }
-            )
-          }
+        Toggle("", isOn: openAccessBinding).labelsHidden().tint(VZ.accent)
       }
       Rectangle().fill(VZ.hair).frame(height: 1)
       VStack(alignment: .leading, spacing: 6) {

@@ -147,12 +147,30 @@ final class ProfileRepository: Sendable {
   }
 
   func deleteMediaAsset(_ asset: MediaAssetRow) async throws {
+    try await deleteMediaAsset(id: asset.id, storagePath: asset.storage_path)
+  }
+
+  /// Web `removeAsset`: the object goes first (an already-missing object
+  /// counts as removed), the row only after Storage confirms. A row without an
+  /// object stays visible and retryable in the media list; an object without a
+  /// row would be invisible and charge quota forever.
+  func deleteMediaAsset(id: String, storagePath: String) async throws {
     let uid = try await userID()
-    _ = try? await client.storage.from("media").remove(paths: [asset.storage_path])
-    try await client.from("media_assets").delete().eq("id", value: asset.id).eq(
-      "user_id",
-      value: uid
-    ).execute()
+    do {
+      _ = try await client.storage.from("media").remove(paths: [storagePath])
+    } catch {
+      let text = "\(error)"
+      let missing = text.range(of: "not.?found", options: [.regularExpression, .caseInsensitive])
+      if missing == nil {
+        throw Failure.message("Couldn't remove the file. \(error.localizedDescription)")
+      }
+    }
+    do {
+      try await client.from("media_assets").delete().eq("id", value: id).eq("user_id", value: uid)
+        .execute()
+    } catch {
+      throw Failure.message("The file is gone but its record remains — retry to clear it.")
+    }
   }
 
   func signedMediaURL(path: String) async throws -> URL {

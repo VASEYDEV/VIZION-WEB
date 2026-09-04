@@ -97,33 +97,43 @@ final class LibraryViewModel {
 
   func loadMore() async {
     guard let library, let cursor = nextCursor, !loadingMore else { return }
+    // A page that lands after a filter change belongs to the old list.
+    let generation = reloadGeneration
     loadingMore = true
     defer { loadingMore = false }
     do {
       if filter.isDraftsView {
         let page = try await library.draftsPage(filter: filter, cursor: cursor)
+        guard generation == reloadGeneration else { return }
         let seen = Set(drafts.map(\.id))
         drafts += page.cards.filter { !seen.contains($0.id) }
         nextCursor = page.nextCursor
       } else {
         let page = try await library.page(filter: filter, cursor: cursor)
+        guard generation == reloadGeneration else { return }
         let seen = Set(cards.map(\.id))
         cards += page.cards.filter { !seen.contains($0.id) }
         nextCursor = page.nextCursor
       }
     } catch {
+      guard generation == reloadGeneration else { return }
       env.toasts.error("Couldn't load more.")
     }
   }
 
   // MARK: Mutations
 
-  private func mutate(_ work: () async throws -> Void) async {
+  /// Runs a write and reloads; `false` means the error toast already showed
+  /// and the caller must not announce success.
+  @discardableResult
+  private func mutate(_ work: () async throws -> Void) async -> Bool {
     do {
       try await work()
       await reload()
+      return true
     } catch {
       env.toasts.error(error.localizedDescription)
+      return false
     }
   }
 
@@ -132,12 +142,14 @@ final class LibraryViewModel {
   }
 
   func setArchived(_ card: PromptCard, _ archived: Bool) async {
-    await mutate { try await library?.setArchived(promptID: card.id, archived) }
+    let ok = await mutate { try await library?.setArchived(promptID: card.id, archived) }
+    guard ok else { return }
     env.toasts.show(archived ? "Archived" : "Unarchived")
   }
 
   func softDelete(_ card: PromptCard) async {
-    await mutate { try await library?.softDelete(promptID: card.id) }
+    let ok = await mutate { try await library?.softDelete(promptID: card.id) }
+    guard ok else { return }
     env.toasts.show("Moved to Recently deleted", actionLabel: "Undo") { [weak self] in
       Task { await self?.mutate { try await self?.library?.undoDelete(promptID: card.id) } }
     }

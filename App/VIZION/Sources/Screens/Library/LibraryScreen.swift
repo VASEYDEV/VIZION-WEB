@@ -290,6 +290,15 @@ struct LibraryBrowser: View {
 struct PromptRow: View {
   var card: PromptCard
   var collectionName: String?
+  @Environment(AppEnvironment.self) private var env
+  @Environment(\.colorScheme) private var colorScheme
+
+  /// Web `--dev-peak`: the owner's stored strength (percent) is the peak
+  /// alpha of the corner field; light mode adds the same +2 the CSS does.
+  private var devAccentPeak: Double {
+    let lift = colorScheme == .light ? 2 : 0
+    return Double(env.appSettings.dev_accent_strength + lift) / 100
+  }
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
@@ -333,7 +342,7 @@ struct PromptRow: View {
       // Trailing corner developer-accent field (web: dev-accents.css).
       if let developer = card.developer {
         RadialGradient(
-          colors: [VZ.developer(developer).opacity(0.26), .clear],
+          colors: [VZ.developer(developer).opacity(devAccentPeak), .clear],
           center: .topTrailing,
           startRadius: 0,
           endRadius: 140

@@ -19,6 +19,17 @@ All notable changes to VIZION for iOS are documented here. The format follows
   resuming a draft switches to the composer.
 - **Deep links**: bare `vizion://library` and `vizion://settings` route to their
   tabs, and links pending when the tab view appears are honoured.
+- **Media**: removing a kept attachment from the tray deletes its stored file
+  and record (web parity); an item removed mid-upload leaves nothing behind;
+  deletion removes the Storage object first and the record only after Storage
+  confirms, so a failed delete stays visible and retryable.
+- **Owner console**: the open-access toggle writes only on a user edit, never
+  on hydration or rollback; the developer accent strength now drives the
+  library-card corner field (+2 in light mode, as the web).
+- **Library**: a load-more page that lands after a filter change is
+  discarded; archive and delete toasts show only after the write succeeds.
+- **Makefile**: `ios-build`/`ios-test` propagate xcodebuild failures
+  (`pipefail`, no unconditional success).
 - **Lint**: SwiftLint config matched to the wire-shaped Codable rows and the
   cursor tuples; SVG path data in tight disable regions; long user copy as
   multi-line literals; `LibraryRepository`, `LibraryScreen` and the composer

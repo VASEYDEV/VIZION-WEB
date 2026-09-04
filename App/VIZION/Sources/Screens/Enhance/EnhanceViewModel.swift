@@ -403,8 +403,26 @@ extension EnhanceViewModel {
     processQueue()
   }
 
+  /// Web `removeItem`: a kept asset leaves Storage together with its tray
+  /// item; if that fails the item stays so the user can retry, exactly as the
+  /// web keeps it. Items still in flight are dropped here and the worker
+  /// cleans up after itself (see `process`).
   func remove(_ id: UUID) {
-    attachments.removeAll { $0.id == id }
+    guard let attachment = attachments.first(where: { $0.id == id }) else { return }
+    guard let assetID = attachment.assetID, let path = attachment.storagePath,
+          let profiles = env.profiles
+    else {
+      attachments.removeAll { $0.id == id }
+      return
+    }
+    Task { [weak self] in
+      do {
+        try await profiles.deleteMediaAsset(id: assetID, storagePath: path)
+        self?.attachments.removeAll { $0.id == id }
+      } catch {
+        self?.env.toasts.error(error.localizedDescription)
+      }
+    }
   }
 
   func setRole(_ role: AttachmentRole, for id: UUID) {
@@ -486,6 +504,11 @@ extension EnhanceViewModel {
           kind: a.kind,
           role: a.role
         )
+        guard attachments.contains(where: { $0.id == id }) else {
+          // Removed while uploading: nothing invisible may keep charging quota.
+          try? await profiles.deleteMediaAsset(id: reserved.id, storagePath: reserved.storage_path)
+          return
+        }
         patch {
           $0.assetID = reserved.id
           $0.storagePath = reserved.storage_path

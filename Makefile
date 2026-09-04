@@ -1,6 +1,7 @@
 # VIZION — developer entry points. `make help` lists them.
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
+.SHELLFLAGS := -o pipefail -c
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -30,12 +31,12 @@ format: ## Apply swiftformat
 ios-build: generate ## Build the app for the iOS Simulator (no signing)
 	xcodebuild -project VIZION.xcodeproj -scheme VIZION \
 	  -destination 'generic/platform=iOS Simulator' \
-	  CODE_SIGNING_ALLOWED=NO build | xcbeautify || true
+	  CODE_SIGNING_ALLOWED=NO build | xcbeautify
 
 ios-test: generate ## Run the app's unit tests on a simulator
 	xcodebuild -project VIZION.xcodeproj -scheme VIZION \
 	  -destination 'platform=iOS Simulator,name=iPhone 17' \
-	  CODE_SIGNING_ALLOWED=NO test | xcbeautify || true
+	  CODE_SIGNING_ALLOWED=NO test | xcbeautify
 
 clean: ## Remove generated project + build output
 	rm -rf VIZION.xcodeproj DerivedData Packages/VizionCore/.build .build
