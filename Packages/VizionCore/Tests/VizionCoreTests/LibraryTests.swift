@@ -68,15 +68,9 @@ final class LibraryTests: XCTestCase {
 
   func testCursorExpressionQuotesEveryValue() {
     let id = "123e4567-e89b-12d3-a456-426614174000"
-    let expr = LibraryPaging.cursorExpression(
-      sort: .updated,
-      cursor: (value: "2026-08-15T11:30:00+00:00", id: id)
-    )
-    XCTAssertEqual(
-      expr,
-      // swiftlint:disable:next line_length
-      "updated_at.lt.\"2026-08-15T11:30:00+00:00\",and(updated_at.eq.\"2026-08-15T11:30:00+00:00\",id.lt.\(id))"
-    )
+    let stamp = "2026-08-15T11:30:00+00:00"
+    let expr = LibraryPaging.cursorExpression(sort: .updated, cursor: (value: stamp, id: id))
+    XCTAssertEqual(expr, "updated_at.lt.\"\(stamp)\",and(updated_at.eq.\"\(stamp)\",id.lt.\(id))")
     let titleExpr = LibraryPaging.cursorExpression(sort: .title, cursor: (value: "a,b\"c", id: id))
     XCTAssertTrue(titleExpr.hasPrefix("title.gt.\"a,b\\\"c\""))
   }
