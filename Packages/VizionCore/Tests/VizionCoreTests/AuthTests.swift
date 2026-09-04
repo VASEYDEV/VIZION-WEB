@@ -20,20 +20,30 @@ final class AuthTests: XCTestCase {
   }
 
   func testSignInNonceHashIsSHA256OfTheRawText() {
-    var generator = CountingGenerator()
-    let nonce = SignInNonce.make(using: &generator)
-    XCTAssertEqual(
-      nonce.raw,
-      "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
-    )
-    XCTAssertEqual(
-      nonce.hashed,
-      "6c86c6aac5fb24bcf5d9939cb7d7d5645ce39418f449e03b262dd4fa14b4b92b"
-    )
+    // A known vector on a CONSTRUCTED nonce: what Apple receives is the
+    // SHA-256 of the exact text Supabase is given. (Which bytes the stdlib
+    // draws from a generator is its business and varies by Swift version —
+    // asserting that would test the wrong thing.)
     XCTAssertEqual(
       SignInNonce(raw: String(repeating: "0", count: 64)).hashed,
       "60e05bd1b195af2f94112fa7197a5c88289058840ce7c6df9693756bc6250f55"
     )
+    XCTAssertEqual(
+      SignInNonce(raw: "abc").hashed,
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    )
+  }
+
+  func testSignInNonceDrawsEveryByteFromTheGivenGenerator() {
+    var a = CountingGenerator()
+    var b = CountingGenerator()
+    XCTAssertEqual(
+      SignInNonce.make(using: &a),
+      SignInNonce.make(using: &b),
+      "the same generator state must yield the same nonce"
+    )
+    var c = CountingGenerator(counter: 7)
+    XCTAssertNotEqual(SignInNonce.make(using: &c), SignInNonce.make(using: &a))
   }
 
   func testAppleAccountsAreNeverPasswordGated() {
