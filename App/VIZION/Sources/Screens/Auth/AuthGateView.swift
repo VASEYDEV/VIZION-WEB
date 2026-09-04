@@ -161,10 +161,15 @@ struct SignInForm: View {
       .buttonStyle(.quiet)
 
       if registrationClosed {
-        Text("New registrations are currently closed. Existing accounts can still sign in.")
-          .font(.vzBody(12))
-          .foregroundStyle(VZ.muted)
-          .multilineTextAlignment(.center)
+        Text(
+          """
+          New registrations are currently closed. Existing accounts can still sign in; \
+          a Google or GitHub sign-in cannot create a new one.
+          """
+        )
+        .font(.vzBody(12))
+        .foregroundStyle(VZ.muted)
+        .multilineTextAlignment(.center)
       }
 
       if case let .error(message) = status {

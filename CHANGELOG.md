@@ -65,6 +65,10 @@ All notable changes to VIZION for iOS are documented here. The format follows
   web's per-row rename.
 - **Companion patch**: account deletion stops if the avatar removal reports
   an error, so a public avatar can never outlive its owner's credentials.
+- **Sign-in (security)**: an account that a Google/GitHub sign-in mints while
+  registration is closed is removed again through the companion endpoint and
+  signed out — OAuth cannot be told `shouldCreateUser`; the runbook names the
+  project-level switch for hard enforcement.
 - **Accounts**: the last result is re-scoped to the signed-in user before any
   network call, so another account's cached enhancement can never show even
   when the profile request fails; composer defaults hydrate once per account

@@ -21,3 +21,14 @@ Apply `docs/companion/0001-native-bearer-auth-and-account-deletion.patch` to
 `SeanVasey/vizion`, run its gate (`npm run lint && npm run typecheck && npm test`),
 merge, deploy. `SUPABASE_SERVICE_ROLE_KEY` must be set on Vercel for
 `DELETE /api/account` (it already is for the web deletion route).
+
+## Closed registration and OAuth
+
+Magic links honour the owner's open-access switch (`shouldCreateUser`); Supabase
+OAuth cannot be told "no new accounts". The app therefore removes an account that
+a Google/GitHub sign-in minted while access was closed (`DELETE /api/account`
+from the companion patch, then sign-out). To hard-enforce it at the source,
+also turn off **Authentication → Providers → Allow new users to sign up** in
+the Supabase dashboard whenever access is closed; turn it back on with
+open access.
+

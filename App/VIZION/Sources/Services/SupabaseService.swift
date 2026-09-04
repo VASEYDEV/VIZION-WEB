@@ -34,12 +34,16 @@ final class SupabaseService: Sendable {
     let email: String?
     let newEmail: String?
     let accessToken: String
+    /// When the auth user was created — a sign-in that MINTED the account has
+    /// this within seconds of now (see `AppEnvironment.purgeIfMintedWhileClosed`).
+    let createdAt: Date?
 
     init(_ session: Session) {
       userID = session.user.id.uuidString.lowercased()
       email = session.user.email
       newEmail = session.user.newEmail
       accessToken = session.accessToken
+      createdAt = session.user.createdAt
     }
   }
 

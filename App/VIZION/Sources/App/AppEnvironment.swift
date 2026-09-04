@@ -136,10 +136,32 @@ final class AppEnvironment {
       // Offline at launch: keep the last-known profile (of THIS account) and
       // let the screens report their own failures.
     }
+    if await purgeIfMintedWhileClosed(session) {
+      return
+    }
     if accountChanged {
       ui.hydrate(profile: profile, userID: userID)
       hydratedUserID = userID
     }
+  }
+
+  /// Supabase OAuth cannot be told "no new accounts" the way a magic link can
+  /// (`shouldCreateUser`). So when access is closed and this very sign-in has
+  /// just minted an account, remove it again through the companion endpoint
+  /// and sign out — the magic-link rule applied one step later. Without the
+  /// endpoint (companion patch not deployed) the account is only signed out,
+  /// which is where the web stops too; the runbook names the project-level
+  /// switch that hard-enforces it.
+  private func purgeIfMintedWhileClosed(_ session: SupabaseService.SessionInfo) async -> Bool {
+    guard !appSettings.open_access, !isOwner(session.userID),
+          let created = session.createdAt, Date().timeIntervalSince(created) < 120
+    else { return false }
+    if let api {
+      try? await api.deleteAccount()
+    }
+    await signOut()
+    pendingAuthError = "New registrations are closed — that sign-in did not create an account."
+    return true
   }
 
   func signOut() async {
