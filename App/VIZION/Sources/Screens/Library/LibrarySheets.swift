@@ -21,9 +21,11 @@ struct LibraryFilterSheet: View {
                 set: {
                   if let v = $0 {
                     draft.view = v
-                    // Drafts always list by last edit (the query has no sort).
+                    // The drafts query has no sort, tag or collection predicates.
                     if v == .drafts {
                       draft.sort = .updated
+                      draft.tag = nil
+                      draft.collection = nil
                     }
                   }
                 }

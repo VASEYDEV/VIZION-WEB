@@ -150,7 +150,11 @@ struct LibraryBrowser: View {
       var next = model.filter
       next.view = view
       if view == .drafts {
-        next.sort = .updated // drafts always list by last edit
+        // The drafts query has no sort, tag or collection predicates; a
+        // badge must not claim filters the list does not apply.
+        next.sort = .updated
+        next.tag = nil
+        next.collection = nil
       }
       model.filter = next
     } label: {

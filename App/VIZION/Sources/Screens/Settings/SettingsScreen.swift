@@ -644,12 +644,17 @@ struct OwnerSection: View {
           step: 1,
           onEditingChanged: { editing in
             if !editing {
-              settingWrite($status) {
-                try await env.profiles?.updateAppSettings(devAccentStrength: Int(strength))
-                // Library cards read `env.appSettings` — refresh so the new
-                // strength renders without a relaunch.
-                await env.refreshAccount()
-              }
+              let previous = Double(env.appSettings.dev_accent_strength)
+              settingWrite(
+                $status,
+                rollback: { strength = previous },
+                work: {
+                  try await env.profiles?.updateAppSettings(devAccentStrength: Int(strength))
+                  // Library cards read `env.appSettings` — refresh so the new
+                  // strength renders without a relaunch.
+                  await env.refreshAccount()
+                }
+              )
             }
           }
         )

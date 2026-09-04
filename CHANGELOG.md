@@ -72,7 +72,12 @@ All notable changes to VIZION for iOS are documented here. The format follows
   minted the account is the app's own OAuth attempt stamp: only an auth user
   created after that instant qualifies, never an account that is merely young.
 - **Owner console**: saving the accent strength refreshes the app settings so
-  library cards render the new value at once.
+  library cards render the new value at once, and a failed save rolls the
+  slider back to the stored value.
+- **Accounts**: an account counts as hydrated only once its profile was
+  actually read, so a refresh that fails at launch is retried by the next one.
+- **Drafts view**: entering it clears tag and collection as well as sort, since
+  the drafts query applies none of them.
 - **Result**: a Polish review decision clears the "Saved" state, since the
   shown output is no longer the saved one.
 - **Accounts**: the last result is re-scoped to the signed-in user before any

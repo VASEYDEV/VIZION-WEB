@@ -130,12 +130,14 @@ final class AppEnvironment {
     if accountChanged {
       profile = nil
     }
+    var fetched = false
     do {
       async let profileTask = profiles.profile()
       async let settingsTask = profiles.appSettings()
       let (profile, settings) = try await (profileTask, settingsTask)
       self.profile = profile
       appSettings = settings
+      fetched = true
     } catch {
       // Offline at launch: keep the last-known profile (of THIS account) and
       // let the screens report their own failures.
@@ -144,8 +146,13 @@ final class AppEnvironment {
       return
     }
     if accountChanged {
+      // The shared-device rule (drop another account's draft) applies even
+      // offline; the account counts as hydrated only once its profile was
+      // actually read, so a later successful refresh applies the defaults.
       ui.hydrate(profile: profile, userID: userID)
-      hydratedUserID = userID
+      if fetched {
+        hydratedUserID = userID
+      }
     }
   }
 
