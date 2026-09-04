@@ -114,6 +114,17 @@ final class SupabaseService: Sendable {
     _ = try await client.auth.session(from: callback)
   }
 
+  /// Sign in with Apple, natively: the identity token Apple issued to this
+  /// app goes straight to Supabase, which verifies it against Apple's keys and
+  /// the nonce, then mints (or resumes) the session — no web-auth session, no
+  /// redirect (ADR-0006). The bundle id must be an authorised client id on the
+  /// Apple provider (runbook `supabase-config.md`).
+  func signInWithApple(idToken: String, nonce: String) async throws {
+    _ = try await client.auth.signInWithIdToken(
+      credentials: OpenIDConnectCredentials(provider: .apple, idToken: idToken, nonce: nonce)
+    )
+  }
+
   /// A magic link / OAuth return that arrived through `onOpenURL` instead of
   /// the web-auth session (the link was opened from Mail).
   func completeSignIn(from url: URL) async throws {

@@ -54,6 +54,14 @@ Images only (≤ ~5 MB decoded). Same gates as enhance.
 "description", "text" (extract_text), "modelUsed", "fallbackFrom"?,
 "usage": {target, tokenIn, tokenOut, costUsd, todayCost, capUsd, estimated?} }`.
 
+## POST /api/auth/apple (companion patch)
+
+`{ "code": "<authorization code from ASAuthorizationAppleIDCredential>" }` →
+204 stored · 400 no code · 401 no session · 429 > 5/hour · 502 Apple refused
+the code · 503 `APPLE_*` unconfigured. The server exchanges the code for a
+refresh token and keeps it so deletion can revoke it (ADR-0006). Best effort:
+the sign-in stands whatever this answers.
+
 ## DELETE /api/account (companion patch)
 
 204 deleted · 401 no session · 429 > 3/hour · 503 service role unconfigured · 500 failed.
@@ -62,7 +70,8 @@ The app signs out locally on 204.
 ## Direct Supabase (user JWT, RLS)
 
 Tables: `profiles`, `prompts`, `prompt_versions`, `collections`, `drafts`,
-`activity_events`, `media_assets`, `app_settings` (row 1, anon-readable).
+`activity_events`, `media_assets`, `app_settings` (row 1, anon-readable),
+`apple_refresh_tokens` (own row; written only by the Apple sign-in path).
 RPCs: `library_save_prompt`, `library_add_version`, `media_reserve`, `media_commit`,
 `update_app_settings`, `claim_app_ownership`. Storage: `avatars` (public read,
 `{uid}/avatar.png`), `media` (private, `{uid}/<uuid>.<ext>`).

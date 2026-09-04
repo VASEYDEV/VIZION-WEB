@@ -243,8 +243,11 @@ struct AccountSection: View {
       FieldStatus(status: emailStatus)
       Rectangle().fill(VZ.hair).frame(height: 1)
       SettingsRow(label: "Connection", detail: profile.auth_method?.connectionLabel ?? "—") {
-        if let method = profile.auth_method, method != .magicLink {
-          ProviderMark(provider: method == .github ? .github : .google, size: 18)
+        switch profile.auth_method {
+        case .github: ProviderMark(provider: .github, size: 18)
+        case .google: ProviderMark(provider: .google, size: 18)
+        case .apple: AppleMark(size: 18)
+        case .magicLink, nil: EmptyView()
         }
       }
       Rectangle().fill(VZ.hair).frame(height: 1)

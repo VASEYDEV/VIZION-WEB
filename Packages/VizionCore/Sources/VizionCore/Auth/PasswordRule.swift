@@ -33,15 +33,21 @@ public enum PasswordRule {
   }
 }
 
+/// `profiles.auth_method` — a Postgres enum label, so the raw values are frozen.
+/// `apple` needs the companion migration (`docs/companion/0002-*.patch`):
+/// without it the web's `handle_new_user()` files an Apple account under
+/// `magic_link` — it still works, but goes through the set-password gate.
 public enum AuthMethod: String, Codable, Sendable, Hashable {
   case magicLink = "magic_link"
   case github
   case google
+  case apple
 
   public var connectionLabel: String {
     switch self {
     case .github: "Connected with GitHub"
     case .google: "Connected with Google"
+    case .apple: "Connected with Apple"
     case .magicLink: "Signed in with email"
     }
   }

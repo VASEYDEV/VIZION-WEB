@@ -35,9 +35,9 @@ final class AppEnvironment {
   /// The account whose composer defaults the UI store carries — hydration
   /// happens once per account (web `ProfileHydrator`), never per refresh.
   private var hydratedUserID: String?
-  /// Set by the sign-in screen when it starts an OAuth flow; consumed by
-  /// `purgeIfMintedWhileClosed`. Only an account created AFTER this instant
-  /// can be one that flow minted.
+  /// Set by the sign-in screen when it starts an OAuth or Sign in with Apple
+  /// flow; consumed by `purgeIfMintedWhileClosed`. Only an account created
+  /// AFTER this instant can be one that flow minted.
   var oauthAttemptStartedAt: Date?
   /// A `?draft=` that arrived while the app was signed out or mid-launch.
   var pendingDraft: String?
@@ -156,13 +156,13 @@ final class AppEnvironment {
     }
   }
 
-  /// Supabase OAuth cannot be told "no new accounts" the way a magic link can
-  /// (`shouldCreateUser`). So when access is closed and this very sign-in has
-  /// just minted an account, remove it again through the companion endpoint
-  /// and sign out — the magic-link rule applied one step later. Without the
-  /// endpoint (companion patch not deployed) the account is only signed out,
-  /// which is where the web stops too; the runbook names the project-level
-  /// switch that hard-enforces it.
+  /// Supabase OAuth (and the Apple id-token grant) cannot be told "no new
+  /// accounts" the way a magic link can (`shouldCreateUser`). So when access
+  /// is closed and this very sign-in has just minted an account, remove it
+  /// again through the companion endpoint and sign out — the magic-link rule
+  /// applied one step later. Without the endpoint (companion patch not
+  /// deployed) the account is only signed out, which is where the web stops
+  /// too; the runbook names the project-level switch that hard-enforces it.
   ///
   /// The proof that THIS sign-in minted the account is the OAuth attempt the
   /// sign-in screen recorded: the auth user must have been created after that
@@ -181,6 +181,29 @@ final class AppEnvironment {
     await signOut()
     pendingAuthError = "New registrations are closed — that sign-in did not create an account."
     return true
+  }
+
+  /// Apple sends the user's name ONCE, on the first authorisation, and only
+  /// to the app — the identity token carries no name, so the web's
+  /// `handle_new_user()` has nothing to copy into `profiles.full_name`. Seed
+  /// it here, but never over a name the account already has (Apple may have
+  /// just linked into an existing same-email account).
+  func seedFullName(_ name: String) async {
+    guard let profiles else { return }
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    // The SDK's session is in place before the id-token call returns; this
+    // read does not wait for the auth-change observer to catch up.
+    guard let current = try? await profiles.profile() else { return }
+    let existing = current.full_name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard existing.isEmpty else { return }
+    do {
+      try await profiles.update(.init(fullName: .some(trimmed)))
+      profile?.full_name = trimmed
+      await refreshAccount()
+    } catch {
+      // Cosmetic: the name is editable under Settings → Identity.
+    }
   }
 
   func signOut() async {
