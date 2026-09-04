@@ -149,6 +149,10 @@ enum WebAuthSession {
   }
 
   private static let context = ContextProvider()
+  /// The in-flight session. ASWebAuthenticationSession must be RETAINED for
+  /// the whole flow — released early it can end without ever calling the
+  /// completion handler, leaving the continuation (and the sign-in form) stuck.
+  private static var active: ASWebAuthenticationSession?
 
   static func run(url: URL, callbackScheme: String) async throws -> URL {
     try await withCheckedThrowingContinuation { continuation in
@@ -156,6 +160,7 @@ enum WebAuthSession {
         url: url,
         callbackURLScheme: callbackScheme
       ) { callback, error in
+        Task { @MainActor in WebAuthSession.active = nil }
         if let callback {
           continuation.resume(returning: callback)
         } else if let error = error as? ASWebAuthenticationSessionError,
@@ -167,7 +172,9 @@ enum WebAuthSession {
       }
       session.presentationContextProvider = context
       session.prefersEphemeralWebBrowserSession = false
+      active = session
       if !session.start() {
+        active = nil
         continuation.resume(throwing: URLError(.cannotConnectToHost))
       }
     }

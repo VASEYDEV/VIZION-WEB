@@ -95,3 +95,10 @@ tray — and the threads say so with the web reference. Every thread is
 resolved. First fully green CI (core · xcodebuild + app unit tests · lint):
 `5e5d95d`; green again on the review heads through `db8b6e4`.
 
+**PR #1 merged** (`bab272b`, 05:08 UTC, merge commit). Codex's last round on
+`a36e188` (three findings: the OAuth session object was not retained for the
+flow — P1; a nil-diff refinement mislabelled the original as "Previous
+result"; the Supabase package was a `from:` range with no checked-in
+resolution) landed after the merge, so the branch was restarted from `main`
+and the fixes go up as a follow-up PR.
+

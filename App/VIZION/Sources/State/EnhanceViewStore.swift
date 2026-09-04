@@ -22,6 +22,10 @@ struct EnhanceView: Codable, Sendable, Hashable {
   var refined: Bool?
   /// Polish's per-change review: hunk indices the user REVERTED.
   var rejected: [Int]?
+  /// A refinement's ACTUAL input — the previous result it was seeded from —
+  /// kept for display when the server returns no diff to reconstruct it
+  /// from. Saves and exports still record `submitted` (web parity).
+  var previousOutput: String?
 
   /// The model that ACTUALLY ran. Under Auto the submitted target is only the
   /// fallback the client sent; the server reports what it resolved to.

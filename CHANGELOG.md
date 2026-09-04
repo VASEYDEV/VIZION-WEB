@@ -65,6 +65,14 @@ All notable changes to VIZION for iOS are documented here. The format follows
   web's per-row rename.
 - **Companion patch**: account deletion stops if the avatar removal reports
   an error, so a public avatar can never outlive its owner's credentials.
+- **Sign-in**: the in-flight `ASWebAuthenticationSession` is retained for the
+  whole OAuth flow, so it can no longer be released mid-flow and leave the
+  form stuck in its busy state.
+- **Result**: a refinement whose diff exceeds the budget shows the result it
+  was seeded from under "Previous result", not the author's original.
+- **Build**: `supabase-swift` is pinned to an exact version in `project.yml`
+  (the generated `Package.resolved` is gitignored, so the pin is the
+  reviewable resolution).
 - **Sign-in (security)**: an account that a Google/GitHub sign-in mints while
   registration is closed is removed again through the companion endpoint and
   signed out — OAuth cannot be told `shouldCreateUser`; the runbook names the

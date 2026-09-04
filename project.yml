@@ -50,7 +50,9 @@ packages:
     path: Packages/VizionCore
   Supabase:
     url: https://github.com/supabase/supabase-swift
-    from: "2.0.0"
+    # Exact pin: the generated project's Package.resolved is gitignored, so
+    # this line IS the reviewable resolution (SECURITY.md → Dependencies).
+    exactVersion: "2.55.1"
 
 targets:
   VIZION:
