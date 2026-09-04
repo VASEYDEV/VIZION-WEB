@@ -7,7 +7,7 @@ import VizionCore
 /// `drafts/*`), from the user's own JWT so RLS scopes every row. Writes also
 /// scope on `user_id` — belt and braces, as the web does.
 final class LibraryRepository: Sendable {
-  // Internal, not private: `LibraryRepository+Drafts.swift` extends this type.
+  /// Internal, not private: `LibraryRepository+Drafts.swift` extends this type.
   let client: SupabaseClient
 
   init(client: SupabaseClient) {
