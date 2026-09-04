@@ -133,12 +133,10 @@ struct LibraryBrowser: View {
           quickChip("All", view: .all)
           quickChip("Favorites", view: .favorites)
           quickChip("Drafts", view: .drafts)
-          Button { model.filter = LibraryFilter(
-            q: model.filter.q,
-            view: model.filter.view,
-            sort: .created
-          ) } label: {
-            ChipLabel(text: "Recent", selected: model.filter.sort == .created)
+          // Web: the Recent chip IS the default view (`router.push("/library")`),
+          // so it clears every narrowing filter rather than silently dropping some.
+          Button { model.filter = .default } label: {
+            ChipLabel(text: "Recent", selected: model.filter.isDefault)
           }
           .buttonStyle(.pressable)
         }

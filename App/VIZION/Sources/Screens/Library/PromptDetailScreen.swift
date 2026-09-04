@@ -51,6 +51,8 @@ final class PromptDetailViewModel {
   private(set) var revised: (input: String, mode: EnhanceMode, result: EnhanceResult)?
   var reviseError: EnhanceFailure?
   private var runTask: Task<Void, Never>?
+  /// See `EnhanceViewModel.runGeneration`.
+  private var reviseGeneration = 0
 
   init(env: AppEnvironment, promptID: String) {
     self.env = env
@@ -117,12 +119,17 @@ final class PromptDetailViewModel {
 
   // MARK: Mutations
 
-  private func mutate(_ work: () async throws -> Void) async {
+  /// Runs a write and reloads; `false` means the error toast already showed
+  /// and the caller must not announce success.
+  @discardableResult
+  private func mutate(_ work: () async throws -> Void) async -> Bool {
     do {
       try await work()
       await load()
+      return true
     } catch {
       env.toasts.error(error.localizedDescription)
+      return false
     }
   }
 
@@ -141,7 +148,10 @@ final class PromptDetailViewModel {
   }
 
   func restore(_ versionID: String) async {
-    await mutate { try await env.library?.restoreVersion(promptID: promptID, versionID: versionID) }
+    let ok = await mutate {
+      try await env.library?.restoreVersion(promptID: promptID, versionID: versionID)
+    }
+    guard ok else { return }
     env.toasts.show("Restored \(label(versionID))")
   }
 
@@ -175,15 +185,26 @@ final class PromptDetailViewModel {
       return
     }
     runTask?.cancel()
+    reviseGeneration += 1
+    let generation = reviseGeneration
     reviseError = nil
     revised = nil
     stream = .started()
     revising = true
     runTask = Task { [weak self] in
+      // Only the run that owns this generation may finish the spinner — a
+      // cancelled predecessor must not hide its replacement. `defer` also
+      // covers a stream that ends without `done`.
+      defer {
+        if let model = self, generation == model.reviseGeneration {
+          model.revising = false
+        }
+      }
       do {
         var done: EnhanceResult?
         for try await event in api.enhance(request) {
           guard let self else { return }
+          guard generation == reviseGeneration else { return }
           if case let .error(status, message, notConfigured, capReached) = event {
             throw EnhanceFailure(
               message: message,
@@ -199,20 +220,28 @@ final class PromptDetailViewModel {
             done = result
           }
         }
-        guard let self, let done else { return }
+        guard let self else { return }
+        guard generation == reviseGeneration else { return }
+        guard let done else {
+          throw EnhanceFailure(message: "The stream ended unexpectedly.", status: 502)
+        }
         revised = (request.input, request.mode, done)
       } catch let failure as EnhanceFailure {
+        guard let self else { return }
+        guard generation == reviseGeneration else { return }
         if !failure.isCancelled {
-          self?.reviseError = failure
+          reviseError = failure
         }
       } catch {
-        self?.reviseError = EnhanceFailure(message: error.localizedDescription, status: 502)
+        guard let self else { return }
+        guard generation == reviseGeneration else { return }
+        reviseError = EnhanceFailure(message: error.localizedDescription, status: 502)
       }
-      self?.revising = false
     }
   }
 
   func cancelRevise() {
+    reviseGeneration += 1
     runTask?.cancel()
     revising = false
     stream = .idle

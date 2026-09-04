@@ -18,6 +18,9 @@ final class EnhanceViewModel {
   private(set) var isRunning = false
   var error: EnhanceFailure?
   private var runTask: Task<Void, Never>?
+  /// Bumped by every start/cancel; a task whose generation is stale is a
+  /// cancelled predecessor and must not mutate the replacement run's state.
+  private var runGeneration = 0
   /// A refinement is a run over the CURRENT result; the chips show a spinner.
   private(set) var refinePending = false
 
@@ -179,6 +182,8 @@ final class EnhanceViewModel {
   private func start(_ request: EnhanceRequest, submitted: EnhanceView.Submitted, refined: Bool) {
     guard let api = env.api else { return }
     runTask?.cancel()
+    runGeneration += 1
+    let generation = runGeneration
     error = nil
     stream = .started()
     isRunning = true
@@ -191,6 +196,7 @@ final class EnhanceViewModel {
         var done: EnhanceResult?
         for try await event in api.enhance(request) {
           guard let self else { return }
+          guard generation == runGeneration else { return }
           switch event {
           case let .delta(text):
             pendingText += text
@@ -213,6 +219,7 @@ final class EnhanceViewModel {
           }
         }
         guard let self else { return }
+        guard generation == runGeneration else { return }
         flush(&pendingText)
         guard let done else {
           throw EnhanceFailure(message: "The stream ended unexpectedly.", status: 502)
@@ -228,21 +235,30 @@ final class EnhanceViewModel {
         )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
       } catch let failure as EnhanceFailure {
-        if !failure.isCancelled {
-          self?.error = failure
-        }
+        self?.finish(generation: generation, failure: failure)
+        return
       } catch {
-        if !(error is CancellationError) {
-          self?.error = EnhanceFailure(message: error.localizedDescription, status: 502)
-        }
+        let failure = error is CancellationError
+          ? nil : EnhanceFailure(message: error.localizedDescription, status: 502)
+        self?.finish(generation: generation, failure: failure)
+        return
       }
-      guard let self else { return }
-      isRunning = false
-      refinePending = false
-      var state = stream
-      state.active = false
-      stream = state
+      self?.finish(generation: generation, failure: nil)
     }
+  }
+
+  /// The run's epilogue. Ignored for a stale generation: a cancelled
+  /// predecessor must not touch the replacement run's state.
+  private func finish(generation: Int, failure: EnhanceFailure?) {
+    guard generation == runGeneration else { return }
+    if let failure, !failure.isCancelled {
+      error = failure
+    }
+    isRunning = false
+    refinePending = false
+    var state = stream
+    state.active = false
+    stream = state
   }
 
   /// Applies the batched delta text — and, optionally, the event that ended
@@ -261,6 +277,7 @@ final class EnhanceViewModel {
   }
 
   func cancel() {
+    runGeneration += 1
     runTask?.cancel()
     runTask = nil
     isRunning = false
@@ -341,7 +358,8 @@ extension EnhanceViewModel {
     var analysisTarget: TargetModel?
     var analyzedIntent: MediaAnalysisIntent?
     var genTarget: GenTarget
-    /// Downscaled JPEG for the vision call; dropped once analysis finishes.
+    /// Downscaled JPEG for the vision call. Kept until removal so a later
+    /// role change can re-analyze (the web keeps the File in `filesRef`).
     var analysisJPEG: Data?
     var original: Data?
 
@@ -552,7 +570,6 @@ extension EnhanceViewModel {
           $0.attrs = attrs
           $0.description = response.description
         }
-        $0.analysisJPEG = nil
         $0.original = nil
       }
       if let fallback = response.fallbackFrom {

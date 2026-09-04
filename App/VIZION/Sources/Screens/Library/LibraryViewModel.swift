@@ -212,7 +212,16 @@ final class LibraryViewModel {
           ui.thinkingLevels.removeValue(forKey: target)
         }
       }
-      try await library.deleteDraft(id: draft.id)
+      // The draft is now the live composer draft; drop the server copy so the
+      // same work does not exist twice. A failure here is not fatal — the body
+      // is already in the composer — but it must not pass silently (web
+      // `DraftsList.resume`): the user still lands in the composer, told why
+      // the library copy remains.
+      do {
+        try await library.deleteDraft(id: draft.id)
+      } catch {
+        env.toasts.error("Opened the draft, but it's still saved in your library.")
+      }
       await reload()
       return true
     } catch {

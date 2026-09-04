@@ -30,6 +30,17 @@ All notable changes to VIZION for iOS are documented here. The format follows
   discarded; archive and delete toasts show only after the write succeeds.
 - **Makefile**: `ios-build`/`ios-test` propagate xcodebuild failures
   (`pipefail`, no unconditional success).
+- **Composer runs**: a cancelled run can no longer finish after its replacement
+  started and hide the new stream (run generations, also for prompt-detail
+  revisions, where a stream ending without `done` now reports an error
+  instead of spinning forever).
+- **Attachments**: the analysis copy stays until removal so a role change made
+  after Ready re-analyzes instead of marking the new role ready with nothing.
+- **Library**: the Recent chip is the web's default view (clears every filter)
+  rather than a sort toggle that silently dropped some; resuming a draft
+  follows the web — the composer takes the draft and a failed server delete is
+  announced instead of leaving the editor and the list disagreeing; the
+  "Restored" toast waits for the write to succeed.
 - **Lint**: SwiftLint config matched to the wire-shaped Codable rows and the
   cursor tuples; SVG path data in tight disable regions; long user copy as
   multi-line literals; `LibraryRepository`, `LibraryScreen` and the composer
